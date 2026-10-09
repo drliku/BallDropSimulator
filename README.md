@@ -77,6 +77,8 @@ The graph uses the same vertical scale as the circle, so the projections line up
 # Time Dilation Lab (`relativity/`)
 
 An interactive special-relativity laboratory built with React, TypeScript, Tailwind CSS and Canvas.
+Styled for The Brain Maze: a coral ship and a periwinkle Earth on navy, with the Brain typeface for titles and the
+large clocks (digits sit in fixed-width cells so running clocks don't jitter).
 Observer A stays on Earth; observer B coasts past in a spaceship at constant velocity. Both clocks
 read zero as the ship passes Earth, then show the time between that event and the ship's current event.
 

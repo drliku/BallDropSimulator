@@ -42,7 +42,7 @@ export function StatsPanel() {
 
       {e.frame === 'ship' && (
         <div className="rounded-xl border border-ship/25 bg-ship/[0.05] p-3.5">
-          <h3 className="mb-1.5 font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-ship-soft">Ship-frame comparison</h3>
+          <h3 className="mb-1.5 font-display text-[16px] font-normal uppercase tracking-[0.1em] text-ship-soft">Ship-frame comparison</h3>
           <dl className="m-0">
             <Row label="Ship clock τ" value={fmt(d.shipTime)} tone="ship" />
             <Row label={<>Earth clock, simultaneous <i>in ship frame</i></>} value={fmt(d.earthInShipFrame)} tone="earth" sub="τ / γ" />

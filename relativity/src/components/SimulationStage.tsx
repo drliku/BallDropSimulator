@@ -47,17 +47,19 @@ function DigitalClock({
   tone, label, sub, value, unit, secondary,
 }: { tone: 'earth' | 'ship'; label: string; sub: React.ReactNode; value: string; unit: string; secondary: string }) {
   const c = tone === 'earth'
-    ? { border: 'border-earth/35', label: 'text-earth-soft', glow: 'shadow-[0_0_40px_rgba(34,211,238,0.12)]', text: 'text-[#e6fbff] [text-shadow:0_0_22px_rgba(34,211,238,0.45)]' }
-    : { border: 'border-ship/40', label: 'text-ship-soft', glow: 'shadow-[0_0_40px_rgba(245,158,11,0.12)]', text: 'text-[#fff7e6] [text-shadow:0_0_22px_rgba(245,158,11,0.45)]' };
+    ? { border: 'border-earth/35', label: 'text-earth-soft', glow: 'shadow-[0_0_40px_rgba(159,176,255,0.12)]', text: 'text-[#eef1ff] [text-shadow:0_0_22px_rgba(159,176,255,0.45)]' }
+    : { border: 'border-ship/40', label: 'text-ship-soft', glow: 'shadow-[0_0_40px_rgba(243,112,100,0.12)]', text: 'text-[#fff1ec] [text-shadow:0_0_22px_rgba(243,112,100,0.45)]' };
   return (
     <div className={`rounded-xl border ${c.border} ${c.glow} bg-space-950/75 px-4 py-3 backdrop-blur-md`}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className={`font-display text-[12px] font-semibold uppercase tracking-[0.2em] ${c.label}`}>{label}</span>
+        <span className={`font-display text-[16px] font-normal uppercase tracking-[0.12em] ${c.label}`}>{label}</span>
         <span className="truncate text-[11px] text-ink-faint">{sub}</span>
       </div>
-      <div className={`mt-1 font-mono text-[30px] font-medium leading-none tabular-nums sm:text-[38px] ${c.text}`}>
-        {value}
-        <span className="ml-2 text-sm font-normal text-ink-muted">{unit}</span>
+      <div className={`clock-value mt-1 font-display text-[36px] leading-none sm:text-[46px] ${c.text}`}>
+        {[...value].map((ch, i) => (
+          <span key={i} className={/\d/.test(ch) ? 'digit' : undefined}>{ch}</span>
+        ))}
+        <span className="ml-2 font-sans text-sm font-normal text-ink-muted">{unit}</span>
       </div>
       <div className="mt-1.5 font-mono text-[11.5px] tabular-nums text-ink-muted">{secondary}</div>
     </div>
@@ -149,7 +151,7 @@ function EarthLane() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = 'rgba(148,163,196,0.6)';
-    ctx.font = '10.5px "IBM Plex Sans", sans-serif';
+    ctx.font = '10.5px Saira, sans-serif';
     ctx.fillText(`Distance from ${shipFrame ? 'the ship, in the ship frame' : 'Earth, in the Earth frame'} (${LIGHT_UNIT[d.unit]})`, (x0 + x1) / 2, h - 5);
     ctx.font = '10.5px "JetBrains Mono", monospace';
 
@@ -159,23 +161,23 @@ function EarthLane() {
     const lx = posOf(lightFrac);
     ctx.save();
     ctx.setLineDash([3, 3]);
-    ctx.strokeStyle = 'rgba(103,232,249,0.75)';
+    ctx.strokeStyle = 'rgba(195,205,255,0.75)';
     ctx.beginPath(); ctx.moveTo(lx, scaleY - 18); ctx.lineTo(lx, scaleY); ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = 'rgba(103,232,249,0.85)';
+    ctx.fillStyle = 'rgba(195,205,255,0.85)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.font = '10px "IBM Plex Sans", sans-serif';
+    ctx.font = '10px Saira, sans-serif';
     if (lightFrac > 0.02) ctx.fillText('light', lx, scaleY - 19);
 
     if (!shipFrame) {
       // Earth at rest, ship moving right along the scale.
       drawEarth(ctx, g.ex, g.ey, g.R, a.spin);
-      drawObserver(ctx, g.ex - g.R * 0.15, g.ey - g.R * 0.98, Math.max(5, g.R * 0.22), '#67e8f9', 'A');
+      drawObserver(ctx, g.ex - g.R * 0.15, g.ey - g.R * 0.98, Math.max(5, g.R * 0.22), '#c3cdff', 'A');
       const sx = posOf(bodyFrac);
       const trail = ctx.createLinearGradient(x0, 0, sx, 0);
-      trail.addColorStop(0, 'rgba(245,158,11,0.05)');
-      trail.addColorStop(1, 'rgba(245,158,11,0.8)');
+      trail.addColorStop(0, 'rgba(243,112,100,0.05)');
+      trail.addColorStop(1, 'rgba(243,112,100,0.8)');
       ctx.strokeStyle = trail;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x0, scaleY + 0.5); ctx.lineTo(sx, scaleY + 0.5); ctx.stroke();
@@ -185,12 +187,12 @@ function EarthLane() {
       const exNow = posOf(bodyFrac);
       const r = g.R * 0.75;
       drawEarth(ctx, exNow, g.ey, r, a.spin);
-      drawObserver(ctx, exNow - r * 0.15, g.ey - r * 0.98, Math.max(4.5, r * 0.22), '#67e8f9', 'A');
-      ctx.strokeStyle = 'rgba(103,232,249,0.6)';
+      drawObserver(ctx, exNow - r * 0.15, g.ey - r * 0.98, Math.max(4.5, r * 0.22), '#c3cdff', 'A');
+      ctx.strokeStyle = 'rgba(195,205,255,0.6)';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x1, scaleY + 0.5); ctx.lineTo(exNow, scaleY + 0.5); ctx.stroke();
       drawShipMarker(ctx, x1, scaleY);
-      ctx.fillStyle = 'rgba(103,232,249,0.9)';
+      ctx.fillStyle = 'rgba(195,205,255,0.9)';
       ctx.beginPath(); ctx.arc(exNow, scaleY + 0.5, 3.5, 0, Math.PI * 2); ctx.fill();
     }
   });
@@ -212,11 +214,11 @@ function EarthLane() {
 
 function drawShipMarker(ctx: CanvasRenderingContext2D, x: number, y: number) {
   const glow = ctx.createRadialGradient(x, y, 0, x, y, 14);
-  glow.addColorStop(0, 'rgba(245,158,11,0.55)');
-  glow.addColorStop(1, 'rgba(245,158,11,0)');
+  glow.addColorStop(0, 'rgba(243,112,100,0.55)');
+  glow.addColorStop(1, 'rgba(243,112,100,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(x - 14, y - 14, 28, 28);
-  ctx.fillStyle = '#fbbf24';
+  ctx.fillStyle = '#ff9488';
   ctx.beginPath();
   ctx.moveTo(x + 7, y + 0.5); ctx.lineTo(x - 5, y - 5); ctx.lineTo(x - 2, y + 0.5); ctx.lineTo(x - 5, y + 6);
   ctx.closePath(); ctx.fill();
@@ -264,8 +266,8 @@ function ShipLane() {
     const bx = g.sx + 1.9 * g.s, by = g.sy + bob - 0.95 * g.s - 9;
     ctx.fillStyle = 'rgba(5,10,24,0.85)';
     ctx.beginPath(); ctx.roundRect(bx - 8, by - 8, 16, 16, 4); ctx.fill();
-    ctx.strokeStyle = '#fcd34d'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = '#fcd34d';
+    ctx.strokeStyle = '#ffb4a8'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#ffb4a8';
     ctx.fillText('B', bx, by + 0.5);
   });
 

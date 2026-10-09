@@ -66,13 +66,14 @@ export const LightClock = forwardRef<HTMLElement, Props>(function LightClock({ s
       const top = p.y + ph * 0.24;
       const bottom = top + L;
       const M0 = Math.min(pw * 0.26, 110);
-      const accent = p.moving ? '245,158,11' : '34,211,238';
+      const accent = p.moving ? '243,112,100' : '159,176,255';
 
-      ctx.font = '600 11px "Chakra Petch", sans-serif';
+      ctx.font = '14px Brain, "Saira Semi Condensed", sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillStyle = `rgba(${accent},0.95)`;
-      ctx.fillText(p.moving ? `MOVING AT ${formatPercentC(b)} c (EARTH FRAME)` : 'CLOCK AT REST', p.x + 14, p.y + 12);
+      // Brain draws lowercase as capitals, so the title avoids a bare "c".
+      ctx.fillText(p.moving ? `MOVING AT ${formatPercentC(b)} OF LIGHT SPEED · EARTH FRAME` : 'CLOCK AT REST', p.x + 14, p.y + 12);
 
       if (!p.moving) {
         const cx = p.x + pw / 2;
@@ -80,11 +81,11 @@ export const LightClock = forwardRef<HTMLElement, Props>(function LightClock({ s
         const sUp = phase <= L ? phase : 2 * L - phase;
         const py = bottom - sUp;
         restTicks = Math.floor((t * c) / (2 * L));
-        ctx.strokeStyle = 'rgba(103,232,249,0.22)';
+        ctx.strokeStyle = 'rgba(195,205,255,0.22)';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bottom); ctx.stroke();
         drawMirrors(ctx, cx, top, bottom, M0, accent);
-        drawPhoton(ctx, cx, py, '103,232,249');
+        drawPhoton(ctx, cx, py, '195,205,255');
         drawGapLabel(ctx, cx + M0 / 2 + 10, top, bottom, 'L');
         drawFooter(ctx, p.x, p.y, ph, `path per leg: L · ticks: ${restTicks}`);
       } else {
@@ -121,12 +122,12 @@ export const LightClock = forwardRef<HTMLElement, Props>(function LightClock({ s
           const xx = cx - vx * (t - tt);
           if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
         }
-        ctx.strokeStyle = 'rgba(252,211,77,0.55)';
+        ctx.strokeStyle = 'rgba(255,180,168,0.55)';
         ctx.lineWidth = 1.6;
         ctx.stroke();
 
         drawMirrors(ctx, cx, top, bottom, M, accent);
-        drawPhoton(ctx, cx, py, '252,211,77');
+        drawPhoton(ctx, cx, py, '255,180,168');
         drawFooter(ctx, p.x, p.y, ph, `path per leg: γL = ${g.toFixed(3)} L · ticks: ${movingTicks}`);
       }
       ctx.restore();
@@ -256,7 +257,7 @@ function drawGapLabel(ctx: CanvasRenderingContext2D, x: number, top: number, bot
   ctx.moveTo(x - 4, bottom); ctx.lineTo(x + 4, bottom);
   ctx.stroke();
   ctx.fillStyle = 'rgba(226,232,240,0.8)';
-  ctx.font = 'italic 13px "IBM Plex Sans", sans-serif';
+  ctx.font = 'italic 13px Saira, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + 7, (top + bottom) / 2);

@@ -35,7 +35,7 @@ export function ControlsPanel() {
           aria-pressed={running}
           className={`btn h-12 text-[15px] font-semibold ${running
             ? 'border-ship/50 bg-ship/10 text-ship-soft hover:bg-ship/20'
-            : 'border-transparent bg-gradient-to-r from-ship to-ship-deep text-space-950 shadow-[0_8px_30px_rgba(245,158,11,0.35)] hover:brightness-110'}`}
+            : 'border-transparent bg-gradient-to-r from-ship to-ship-deep text-space-950 shadow-[0_8px_30px_rgba(243,112,100,0.35)] hover:brightness-110'}`}
         >
           {running ? (
             <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
@@ -144,7 +144,7 @@ export function ControlsPanel() {
               aria-pressed={frame === f}
               onClick={() => engine.setFrame(f)}
               className={`h-9 rounded-md text-[13px] font-medium transition-colors ${frame === f
-                ? f === 'earth' ? 'bg-earth/15 text-earth-soft shadow-[inset_0_0_0_1px_rgba(34,211,238,0.4)]' : 'bg-ship/15 text-ship-soft shadow-[inset_0_0_0_1px_rgba(245,158,11,0.45)]'
+                ? f === 'earth' ? 'bg-earth/15 text-earth-soft shadow-[inset_0_0_0_1px_rgba(159,176,255,0.4)]' : 'bg-ship/15 text-ship-soft shadow-[inset_0_0_0_1px_rgba(243,112,100,0.45)]'
                 : 'text-ink-muted hover:text-ink'}`}
             >
               {f === 'earth' ? 'Earth frame' : 'Ship frame'}

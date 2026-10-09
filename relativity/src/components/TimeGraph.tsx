@@ -41,14 +41,14 @@ export function TimeGraph() {
     ctx.strokeStyle = 'rgba(148,163,196,0.4)';
     ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + ph); ctx.lineTo(pad.l + pw, pad.t + ph); ctx.stroke();
 
-    ctx.font = '11.5px "IBM Plex Sans", sans-serif';
-    ctx.fillStyle = shipFrame ? 'rgba(252,211,77,0.9)' : 'rgba(103,232,249,0.9)';
+    ctx.font = '11.5px Saira, sans-serif';
+    ctx.fillStyle = shipFrame ? 'rgba(255,180,168,0.9)' : 'rgba(195,205,255,0.9)';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText(shipFrame ? `Ship time τ (${UNIT_SHORT[d.unit]})` : `Earth time Δt (${UNIT_SHORT[d.unit]})`, pad.l + pw / 2, h - 4);
     ctx.save();
     ctx.translate(13, pad.t + ph / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = shipFrame ? 'rgba(103,232,249,0.9)' : 'rgba(252,211,77,0.9)';
+    ctx.fillStyle = shipFrame ? 'rgba(195,205,255,0.9)' : 'rgba(255,180,168,0.9)';
     ctx.textBaseline = 'middle';
     ctx.fillText(shipFrame ? `Earth clock (${UNIT_SHORT[d.unit]})` : `Ship time Δτ (${UNIT_SHORT[d.unit]})`, 0, 0);
     ctx.restore();
@@ -65,12 +65,12 @@ export function TimeGraph() {
 
     const inv = 1 / d.gamma;
     const nowX = (shipFrame ? d.shipTime : d.earthTime) / u;
-    const tone = shipFrame ? ['103,232,249', '#67e8f9'] : ['245,158,11', '#fbbf24'];
+    const tone = shipFrame ? ['195,205,255', '#c3cdff'] : ['243,112,100', '#ff9488'];
 
     if (shipFrame) {
       // Earth-frame simultaneity: Earth reading γτ (dotted, for contrast)
       ctx.setLineDash([2, 4]);
-      ctx.strokeStyle = 'rgba(103,232,249,0.4)';
+      ctx.strokeStyle = 'rgba(195,205,255,0.4)';
       ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(max), Y(max * d.gamma)); ctx.stroke();
       ctx.setLineDash([]);
     }

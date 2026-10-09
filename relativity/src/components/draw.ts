@@ -33,8 +33,8 @@ export function drawStaticStars(ctx: CanvasRenderingContext2D, stars: Star[], w:
 /** Earth with oceans, landmasses, clouds, terminator and a cyan atmosphere. */
 export function drawEarth(ctx: CanvasRenderingContext2D, x: number, y: number, R: number, spin: number) {
   const glow = ctx.createRadialGradient(x, y, R * 0.85, x, y, R * 1.75);
-  glow.addColorStop(0, 'rgba(56,189,248,0.38)');
-  glow.addColorStop(1, 'rgba(56,189,248,0)');
+  glow.addColorStop(0, 'rgba(159,176,255,0.38)');
+  glow.addColorStop(1, 'rgba(159,176,255,0)');
   ctx.fillStyle = glow;
   ctx.beginPath(); ctx.arc(x, y, R * 1.75, 0, Math.PI * 2); ctx.fill();
 
@@ -76,7 +76,7 @@ export function drawEarth(ctx: CanvasRenderingContext2D, x: number, y: number, R
   ctx.fillRect(x - R, y - R, R * 2, R * 2);
   ctx.restore();
 
-  ctx.strokeStyle = 'rgba(103,232,249,0.65)';
+  ctx.strokeStyle = 'rgba(195,205,255,0.65)';
   ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
 }
@@ -116,10 +116,10 @@ export function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, s:
     const len = s * (1.4 + 5.5 * thrust) * flick;
     const rx = x - 2.95 * s;
     const plume = ctx.createLinearGradient(rx, y, rx - len, y);
-    plume.addColorStop(0, 'rgba(255,247,214,0.95)');
-    plume.addColorStop(0.25, 'rgba(251,191,36,0.75)');
-    plume.addColorStop(0.6, 'rgba(249,115,22,0.35)');
-    plume.addColorStop(1, 'rgba(249,115,22,0)');
+    plume.addColorStop(0, 'rgba(255,241,236,0.95)');
+    plume.addColorStop(0.25, 'rgba(255,148,136,0.75)');
+    plume.addColorStop(0.6, 'rgba(224,86,74,0.35)');
+    plume.addColorStop(1, 'rgba(224,86,74,0)');
     ctx.fillStyle = plume;
     ctx.beginPath();
     ctx.moveTo(rx, y - 0.34 * s);
@@ -130,9 +130,9 @@ export function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, s:
   }
   // Fins
   const fin = ctx.createLinearGradient(0, y - 1.35 * s, 0, y + 1.35 * s);
-  fin.addColorStop(0, '#fbbf24');
-  fin.addColorStop(0.5, '#b45309');
-  fin.addColorStop(1, '#fbbf24');
+  fin.addColorStop(0, '#ff9488');
+  fin.addColorStop(0.5, '#b8443a');
+  fin.addColorStop(1, '#ff9488');
   ctx.fillStyle = fin;
   for (const dir of [-1, 1]) {
     ctx.beginPath();
@@ -146,7 +146,7 @@ export function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, s:
   // Engine block and nozzle
   ctx.fillStyle = '#2f3749';
   ctx.beginPath(); ctx.roundRect(x - 3.0 * s, y - 0.4 * s, 0.5 * s, 0.8 * s, 0.1 * s); ctx.fill();
-  ctx.fillStyle = `rgba(251,191,36,${0.35 + 0.6 * thrust})`;
+  ctx.fillStyle = `rgba(255,148,136,${0.35 + 0.6 * thrust})`;
   ctx.fillRect(x - 3.02 * s, y - 0.28 * s, 0.08 * s, 0.56 * s);
   // Hull
   const hull = ctx.createLinearGradient(0, y - 0.6 * s, 0, y + 0.6 * s);
@@ -168,24 +168,24 @@ export function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, s:
   for (const px of [-1.7, -0.4, 0.9]) {
     ctx.beginPath(); ctx.moveTo(x + px * s, y - 0.55 * s); ctx.lineTo(x + px * s, y + 0.55 * s); ctx.stroke();
   }
-  ctx.fillStyle = 'rgba(245,158,11,0.9)';
+  ctx.fillStyle = 'rgba(243,112,100,0.9)';
   ctx.fillRect(x - 2.5 * s, y + 0.12 * s, 3.4 * s, 0.13 * s);
   // Portholes
-  ctx.fillStyle = '#fde68a';
+  ctx.fillStyle = '#ffd6cd';
   for (const px of [-1.25, -0.85, -0.45]) {
     ctx.beginPath(); ctx.arc(x + px * s, y - 0.2 * s, 0.09 * s, 0, Math.PI * 2); ctx.fill();
   }
   // Cockpit canopy
   const glass = ctx.createLinearGradient(x + 1.3 * s, y - 0.45 * s, x + 2.5 * s, y);
-  glass.addColorStop(0, '#fff7d6');
-  glass.addColorStop(1, '#f59e0b');
+  glass.addColorStop(0, '#fff1ec');
+  glass.addColorStop(1, '#f37064');
   ctx.fillStyle = glass;
   ctx.beginPath(); ctx.ellipse(x + 1.85 * s, y - 0.17 * s, 0.62 * s, 0.24 * s, -0.08, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.beginPath(); ctx.ellipse(x + 1.65 * s, y - 0.27 * s, 0.22 * s, 0.06 * s, -0.1, 0, Math.PI * 2); ctx.fill();
   // Blinking nav lights on the fin tips
   const blink = Math.sin(time * 4) > 0.6 ? 1 : 0.25;
-  ctx.fillStyle = `rgba(252,211,77,${blink})`;
+  ctx.fillStyle = `rgba(255,180,168,${blink})`;
   ctx.beginPath(); ctx.arc(x - 2.7 * s, y - 1.38 * s, 0.09 * s + 0.6, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(x - 2.7 * s, y + 1.38 * s, 0.09 * s + 0.6, 0, Math.PI * 2); ctx.fill();
 }

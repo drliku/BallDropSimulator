@@ -14,7 +14,7 @@ function Card({ tag, title, tone, children, action, live }: {
     <article className={`glass relative flex flex-col gap-3 p-5 before:absolute before:inset-x-5 before:top-0 before:h-px before:bg-gradient-to-r ${ring} before:to-transparent`}>
       <div className="flex items-center gap-2">
         <span className="rounded-md border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[11px] text-ink-muted">{tag}</span>
-        <h3 className="font-display text-[17px] font-semibold tracking-wide text-ink">{title}</h3>
+        <h3 className="font-display text-[21px] font-normal uppercase tracking-[0.04em] text-ink">{title}</h3>
       </div>
       <div className="flex flex-col gap-2 text-[13px] leading-relaxed text-ink-muted">{children}</div>
       {live && <div className="rounded-lg border border-white/[0.07] bg-black/25 px-3 py-2 font-mono text-[12px] tabular-nums text-ink">{live}</div>}
@@ -42,7 +42,7 @@ export function Scenarios({ onLightClock }: { onLightClock: () => void }) {
 
   return (
     <section aria-labelledby="scenariosTitle" className="flex flex-col gap-4">
-      <h2 id="scenariosTitle" className="font-display text-2xl font-semibold tracking-wide text-ink">Guided scenarios</h2>
+      <h2 id="scenariosTitle" className="font-display text-[30px] font-normal uppercase tracking-[0.04em] text-ship">Guided scenarios</h2>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card
           tag="A"

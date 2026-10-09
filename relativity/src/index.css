@@ -2,11 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Palette: deep navy and black lab, cyan/blue for Earth, amber/orange for the ship. */
+/* The Brain Maze: coral #F37064 on navy #243056. Ship = brand coral, Earth = periwinkle. */
+@font-face {
+  /* Brain by Vladimir Nikolic, the logo typeface. One weight; lowercase letters are drawn as capitals. */
+  font-family: 'Brain';
+  src: url('./assets/Brain.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
-  --earth: #22d3ee;
-  --ship: #f59e0b;
+  --earth: #9fb0ff;
+  --ship: #f37064;
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -14,7 +22,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #03060f;
+  background-color: #0e1530;
   background-image:
     radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.55) 50%, transparent 51%),
     radial-gradient(1px 1px at 72% 8%, rgba(255,255,255,0.45) 50%, transparent 51%),
@@ -22,11 +30,11 @@ body {
     radial-gradient(1px 1px at 88% 44%, rgba(255,255,255,0.4) 50%, transparent 51%),
     radial-gradient(1.5px 1.5px at 56% 84%, rgba(186,230,253,0.5) 50%, transparent 51%),
     radial-gradient(1px 1px at 22% 92%, rgba(255,255,255,0.3) 50%, transparent 51%),
-    radial-gradient(900px 500px at 15% -10%, rgba(34,211,238,0.10), transparent 60%),
-    radial-gradient(800px 500px at 100% 10%, rgba(245,158,11,0.07), transparent 60%),
+    radial-gradient(900px 500px at 15% -10%, rgba(159,176,255,0.10), transparent 60%),
+    radial-gradient(800px 500px at 100% 10%, rgba(243,112,100,0.07), transparent 60%),
     linear-gradient(rgba(148,163,196,0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148,163,196,0.035) 1px, transparent 1px),
-    linear-gradient(180deg, #050a18 0%, #02040b 100%);
+    linear-gradient(180deg, #172042 0%, #0e1530 100%);
   background-size: 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, auto, auto, 32px 32px, 32px 32px, auto;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -37,8 +45,10 @@ body {
     @apply rounded-2xl border border-white/[0.08] bg-space-850/70 shadow-glass backdrop-blur-md;
   }
   .panel-title {
-    @apply font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-ink-muted;
+    @apply font-display text-[17px] font-normal uppercase tracking-[0.1em] text-ship;
   }
+  /* Brain digits are proportional; fixed cells stop running clocks from jittering. */
+  .digit { display: inline-block; width: 0.47em; text-align: center; }
   .seg {
     @apply grid auto-cols-fr grid-flow-col gap-1 rounded-lg border border-white/[0.07] bg-black/30 p-1;
   }
@@ -68,28 +78,28 @@ input[type='range'] {
   background: transparent;
   cursor: pointer;
   --pct: 50%;
-  --fill: #f59e0b;
+  --fill: #f37064;
 }
 input[type='range']::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 99px;
-  background: linear-gradient(90deg, rgba(251,146,60,0.9), var(--fill) var(--pct), rgba(148,163,196,0.18) var(--pct));
+  background: linear-gradient(90deg, rgba(240,98,86,0.9), var(--fill) var(--pct), rgba(148,163,196,0.18) var(--pct));
 }
 input[type='range']::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(148,163,196,0.18); }
 input[type='range']::-moz-range-progress { height: 4px; border-radius: 99px; background: var(--fill); }
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 18px; height: 18px; margin-top: -7px; border-radius: 50%;
-  background: #fff7e6; border: 3px solid var(--fill);
-  box-shadow: 0 0 0 5px rgba(245,158,11,0.16), 0 0 16px rgba(245,158,11,0.6);
+  background: #243056; border: 3px solid var(--fill);
+  box-shadow: 0 0 0 5px rgba(243,112,100,0.16), 0 0 16px rgba(243,112,100,0.6);
 }
 input[type='range']::-moz-range-thumb {
   width: 12px; height: 12px; border-radius: 50%;
-  background: #fff7e6; border: 3px solid var(--fill);
-  box-shadow: 0 0 0 5px rgba(245,158,11,0.16), 0 0 16px rgba(245,158,11,0.6);
+  background: #243056; border: 3px solid var(--fill);
+  box-shadow: 0 0 0 5px rgba(243,112,100,0.16), 0 0 16px rgba(243,112,100,0.6);
 }
-input[type='range'].earth-range { --fill: #22d3ee; }
-input[type='range'].earth-range::-webkit-slider-thumb { background: #e6fbff; box-shadow: 0 0 0 5px rgba(34,211,238,0.16), 0 0 16px rgba(34,211,238,0.6); }
+input[type='range'].earth-range { --fill: #9fb0ff; }
+input[type='range'].earth-range::-webkit-slider-thumb { background: #243056; box-shadow: 0 0 0 5px rgba(159,176,255,0.16), 0 0 16px rgba(159,176,255,0.6); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
