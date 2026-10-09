@@ -3,6 +3,7 @@ import { useUi } from '../runtime/context';
 import { EXPERIMENTS } from '../sim/experiments';
 import { PARAM_META, type ParamGroup, type Params } from '../sim/params';
 import { experimentOutcomes } from './outcomes';
+import { WEATHER_ICON, WEATHER_LABEL } from '../sim/weather';
 
 type Tab = 'experiments' | 'populations' | 'biology' | 'environment' | 'runs';
 const TABS: { id: Tab; label: string }[] = [
@@ -33,12 +34,37 @@ function ParamGroupPanel({ group }: { group: ParamGroup }) {
   const keys = (Object.keys(PARAM_META) as (keyof Params)[]).filter((k) => PARAM_META[k].group === group);
   return (
     <div className="flex flex-col gap-3">
+      {group === 'environment' && <WeatherCard />}
       <p className="text-[12px] leading-snug text-ink-faint">These sliders change the running model immediately. Hover a slider for what it does.</p>
       {keys.map((k) => {
         const m = PARAM_META[k];
         return <Slider key={k} label={m.label} help={m.help} value={ctl.sim.params[k]} min={m.min} max={m.max} step={m.step} format={m.format} onChange={(v) => ctl.setParams({ [k]: v })} />;
       })}
       <button type="button" className="btn self-start" onClick={() => ctl.restoreDefaults()}>Restore default parameters</button>
+    </div>
+  );
+}
+
+function WeatherCard() {
+  const ctl = useUi();
+  const w = ctl.sim.weather;
+  const pct = (v: number) => `${v >= 1 ? '+' : ''}${((v - 1) * 100).toFixed(0)}%`;
+  return (
+    <div className="rounded-lg border border-white/[0.07] p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[22px]" aria-hidden="true">{WEATHER_ICON[w.kind]}</span>
+        <div>
+          <div className="font-display text-[15px] uppercase tracking-[0.05em]">{WEATHER_LABEL[w.kind]}</div>
+          <div className="text-[11.5px] text-ink-muted">Wind {(3 + 12 * w.mix.wind).toFixed(0)} m/s</div>
+        </div>
+      </div>
+      <dl className="mt-1.5 grid grid-cols-[1fr_auto] gap-x-3 font-mono text-[11.5px]">
+        <dt className="text-ink-muted">Sight and smell</dt><dd className="m-0 text-right">{pct(w.visibility)}</dd>
+        <dt className="text-ink-muted">Movement</dt><dd className="m-0 text-right">{pct(w.mobility)}</dd>
+        <dt className="text-ink-muted">Plant growth</dt><dd className="m-0 text-right">{pct(w.growth)}</dd>
+        <dt className="text-ink-muted">Deer thirst</dt><dd className="m-0 text-right">{pct(w.thirst)}</dd>
+        <dt className="text-ink-muted">Wolf capture chance</dt><dd className="m-0 text-right">{pct(w.capture)}</dd>
+      </dl>
     </div>
   );
 }

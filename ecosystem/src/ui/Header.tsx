@@ -3,6 +3,7 @@ import { useUi } from '../runtime/context';
 import { SPEEDS, type CameraMode } from '../runtime/controller';
 import type { HeatKind } from '../sim/heatmaps';
 import { seasonName } from '../sim/vegetation';
+import { WEATHER_ICON, WEATHER_LABEL } from '../sim/weather';
 
 function clock(t: number) {
   const m = Math.floor(t * 24 * 60);
@@ -34,6 +35,7 @@ export function Header() {
           <span className="text-ink">Day {Math.floor(sim.day)}</span>
           <span className="text-ink-muted">{clock(sim.timeOfDay)}</span>
           <span className="text-forest-soft">{seasonName(sim.day)}</span>
+          <span className="text-ink" title="Current weather (see the Environment tab for its effects)"><span aria-hidden="true">{WEATHER_ICON[sim.weather.kind]}</span> {WEATHER_LABEL[sim.weather.kind]}</span>
         </div>
         <button type="button" className="btn btn-primary w-24 whitespace-nowrap" onClick={() => ctl.toggle()} aria-label={ctl.playing ? 'Pause' : 'Play'}>
           {ctl.playing ? '❚❚ Pause' : '▶ Play'}
@@ -79,6 +81,8 @@ export function ViewToolbar() {
           </select>
         </label>
         <button type="button" className="chip" aria-pressed={ctl.dayNight} onClick={() => ctl.setDayNight(!ctl.dayNight)}>Day/night</button>
+        <button type="button" className="chip" aria-pressed={ctl.huntAlerts} onClick={() => ctl.setHuntAlerts(!ctl.huntAlerts)} title="Highlight hunts in the forest and announce them">Hunt alerts</button>
+        <button type="button" className="chip" aria-pressed={ctl.huntCam} onClick={() => ctl.setHuntCam(!ctl.huntCam)} title="Automatically slow to 1× and follow every new hunt">Hunt cam</button>
       </div>
       {ctl.speed > 2 && ctl.dayNight && (
         <p className="pointer-events-none w-full text-right text-[11px] text-ink-faint">Lighting is held at daylight above 2× so it does not flicker.</p>

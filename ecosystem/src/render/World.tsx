@@ -15,6 +15,7 @@ const SEG = 150;
 const world = getWorld();
 const C = (hex: string) => new THREE.Color(hex);
 const LUSH = C('#5d8f37'), DRY = C('#a39060'), BARE = C('#7d6a4c'), FOREST = C('#3d5a2a'), MUD = C('#6e6248'), ROCKY = C('#7d7a6e');
+const WET = C('#2f3a22'), SNOW = C('#eef3f7');
 
 function vegFraction(veg: { B: Float32Array }, x: number, z: number, cap: number) {
   return Math.min(1, veg.B[cellIndex(x, z)] / Math.max(0.1, cap));
@@ -45,6 +46,7 @@ export function Terrain() {
     const col = geo.attributes.color as THREE.BufferAttribute;
     const cap = sim.params.vegCapacity * Math.max(0.3, sim.params.habitat);
     const winter = 1 - Math.min(1, sim.season);
+    const snow = Math.min(1, sim.weather.mix.snow * 0.9), wet = sim.weather.mix.rain * 0.18;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       const c = cellIndex(x, z);
@@ -55,6 +57,8 @@ export function Terrain() {
       const slope = world.slopeAt(x, z);
       if (slope > 0.35) tmp.lerp(ROCKY, Math.min(0.6, (slope - 0.35) * 1.5));
       if (winter > 0) tmp.lerp(DRY, winter * 0.25);
+      if (wet > 0.01) tmp.lerp(WET, wet);
+      if (snow > 0.01) tmp.lerp(SNOW, snow * (slope > 0.6 ? 0.5 : 0.92) * (1 - 0.35 * world.forest[c]));
       col.setXYZ(i, tmp.r, tmp.g, tmp.b);
     }
     col.needsUpdate = true;

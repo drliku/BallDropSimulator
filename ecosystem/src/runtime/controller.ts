@@ -14,6 +14,7 @@ import type { HeatKind } from '../sim/heatmaps';
 import { DEFAULT_PARAMS, DEFAULT_SETUP, type Params, type Setup } from '../sim/params';
 import { randomSeed } from '../sim/rng';
 import type { SeriesKey } from '../sim/history';
+import type { HuntResult, HuntTracker } from '../sim/hunts';
 
 export const TICKS_PER_SECOND = 10;
 export const SPEEDS = [1, 2, 5, 10] as const;
@@ -41,6 +42,10 @@ export interface ExperimentBaseline {
 
 type Listener = () => void;
 
+/** A finished hunt, shown briefly as a toast and as a burst in the 3D view. */
+export interface HuntFlash extends HuntResult { at: number }
+const FLASH_MS = 7000;
+
 const RUN_COLORS = ['#f2c14e', '#c084fc', '#5eead4', '#f472b6'];
 
 export class Controller {
@@ -64,6 +69,14 @@ export class Controller {
   chartPaused = false;
   savedRuns: SavedRun[] = [];
   experiment: ExperimentBaseline | null = null;
+  /** Show hunt markers, the hunt banner and outcome toasts. */
+  huntAlerts = true;
+  /** Automatically slow down and follow each new hunt. */
+  huntCam = false;
+  huntFlashes: HuntFlash[] = [];
+  private tracker: HuntTracker | null = null;
+  private seenResult = 0;
+  private seenStart = 0;
   private nextRunId = 1;
 
   uiVersion = 0;
@@ -94,6 +107,7 @@ export class Controller {
       this.alpha = Math.min(1, this.acc);
       if (this.selectedId !== -1 && !this.sim.byId.has(this.selectedId)) this.onSelectedDied();
     }
+    this.checkHunts(now);
     if (now - this.lastEmit > 160) this.emit(now);
   }
 
@@ -208,6 +222,38 @@ export class Controller {
   setHeat(h: HeatKind | null) { this.heat = h; this.emit(); }
   setDayNight(on: boolean) { this.dayNight = on; this.emit(); }
   setShowRadius(on: boolean) { this.showRadius = on; this.emit(); }
+
+  // ------------------------------------------------------------------ hunts
+
+  private checkHunts(now: number) {
+    const ht = this.sim.hunts;
+    if (ht !== this.tracker) { this.tracker = ht; this.seenResult = ht.resultSeq; this.seenStart = ht.startSeq; this.huntFlashes = []; }
+    if (ht.resultSeq !== this.seenResult) {
+      for (const r of ht.results) if (r.seq > this.seenResult && r.outcome !== 'called off') this.huntFlashes.push({ ...r, at: now });
+      this.seenResult = ht.resultSeq;
+      if (this.huntFlashes.length > 6) this.huntFlashes.splice(0, this.huntFlashes.length - 6);
+      this.emit(now);
+    }
+    if (this.huntFlashes.length && now - this.huntFlashes[0].at > FLASH_MS) this.huntFlashes = this.huntFlashes.filter((f) => now - f.at <= FLASH_MS);
+    if (ht.startSeq !== this.seenStart) {
+      this.seenStart = ht.startSeq;
+      // Hunt cam: jump to a new hunt unless we are already watching one.
+      if (this.huntCam && !(this.cameraMode === 'follow' && ht.active.has(this.selectedId))) this.watchHunt();
+    }
+  }
+
+  /** Slow to 1× and follow the deer being hunted (the most advanced hunt if none is given). */
+  watchHunt(deerId?: number) {
+    const ht = this.sim.hunts;
+    const h = deerId !== undefined ? ht.active.get(deerId) : ht.focus();
+    if (!h) return;
+    this.selectedId = h.deerId;
+    if (this.speed > 1) this.speed = 1;
+    this.playing = true;
+    this.setCamera('follow');
+  }
+  setHuntAlerts(on: boolean) { this.huntAlerts = on; this.emit(); }
+  setHuntCam(on: boolean) { this.huntCam = on; if (on) this.huntAlerts = true; this.emit(); if (on) this.watchHunt(); }
 
   // ------------------------------------------------------------------ chart and runs
 

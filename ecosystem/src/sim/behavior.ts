@@ -133,7 +133,7 @@ function setState(a: Animal, s: Animal['state']) {
 
 /** How visible things are: daylight and canopy. */
 function visibility(sim: Ecosystem, x: number, z: number) {
-  return (0.5 + 0.5 * sim.daylight) * (1 - 0.4 * sim.world.forest[cellIndex(x, z)]);
+  return (0.5 + 0.5 * sim.daylight) * (1 - 0.4 * sim.world.forest[cellIndex(x, z)]) * sim.weather.visibility;
 }
 
 // ------------------------------------------------------------------ deer
@@ -146,7 +146,7 @@ export function updateDeer(sim: Ecosystem, d: Animal) {
   if (d.escapeTicks > 0) d.escapeTicks--;
 
   // Thirst (faster in drought); prolonged dehydration drains energy and eventually kills.
-  d.hydration = Math.max(0, d.hydration - DEER_HYDRATION_LOSS * (1 + 0.8 * p.drought));
+  d.hydration = Math.max(0, d.hydration - DEER_HYDRATION_LOSS * (1 + 0.8 * p.drought) * sim.weather.thirst);
   if (d.hydration <= 0) { d.dryTicks++; d.energy = Math.max(0, d.energy - 0.25); } else d.dryTicks = 0;
 
   // ---- Perception: wolves
@@ -194,7 +194,7 @@ export function updateDeer(sim: Ecosystem, d: Animal) {
     }
   }
 
-  const speedMul = p.deerSpeed;
+  const speedMul = p.deerSpeed * sim.weather.mobility;
   const c = cellIndex(d.x, d.z);
 
   // ---- Act on the current state
@@ -378,7 +378,7 @@ export function updateWolf(sim: Ecosystem, w: Animal) {
   if (w.attemptCooldown > 0) w.attemptCooldown--;
   const pack = sim.packs.get(w.packId);
   const leader = pack ? sim.byId.get(pack.leaderId) : undefined;
-  const speedMul = p.wolfSpeed;
+  const speedMul = p.wolfSpeed * sim.weather.mobility;
 
   switch (w.state) {
     case 'chase': chase(sim, w, speedMul); return;
@@ -387,7 +387,9 @@ export function updateWolf(sim: Ecosystem, w: Animal) {
       if (!d || !d.alive) { w.decideIn = 0; break; }
       const t = toward(w, d.x, d.z);
       if (t.d > p.wolfSensing * 1.5) { w.targetId = -1; w.decideIn = 0; break; }
-      if (t.d < 15 || d.state === 'flee') { setState(w, 'chase'); chase(sim, w, speedMul); return; }
+      // Wolves creep in for a moment before the rush (about 2 s at 1×) unless the deer bolts first.
+      if (d.state === 'flee' || (t.d < 15 && w.stateTicks >= STALK_MIN_TICKS)) { setState(w, 'chase'); chase(sim, w, speedMul); return; }
+      if (t.d < 15) { move(sim, w, T, { dx: t.dx, dz: t.dz, speed: 0.12 * speedMul }); return; }
       move(sim, w, T, { dx: t.dx, dz: t.dz, speed: 0.28 * speedMul });
       return;
     }
@@ -486,7 +488,7 @@ function decideWolf(sim: Ecosystem, w: Animal, leader: Animal | undefined) {
       return;
     }
     // Look for prey directly.
-    const range = p.wolfSensing * (0.75 + 0.25 * sim.daylight) * (1 - 0.3 * sim.world.forest[cellIndex(w.x, w.z)]);
+    const range = p.wolfSensing * (0.75 + 0.25 * sim.daylight) * (1 - 0.3 * sim.world.forest[cellIndex(w.x, w.z)]) * (0.5 + 0.5 * sim.weather.visibility);
     let best: Animal | null = null, bestScore = 0;
     sim.deerHash.query(w.x, w.z, range, (i) => {
       const d = sim.animals[i];
@@ -538,6 +540,8 @@ function patrolTarget(sim: Ecosystem, w: Animal, r: number) {
   w.tx = pt.x; w.tz = pt.z;
 }
 
+const STALK_MIN_TICKS = 20;
+
 /** Pursuit with lead, stamina limits, give-up rules and the capture attempt. */
 function chase(sim: Ecosystem, w: Animal, speedMul: number) {
   const T = WOLF;
@@ -576,7 +580,7 @@ function chase(sim: Ecosystem, w: Animal, speedMul: number) {
     const packBonus = 1 + 0.35 * Math.min(3, support);
     const cover = 1 - 0.35 * sim.world.forest[cellIndex(d.x, d.z)];
     const light = sim.daylight < 0.15 ? 1 : sim.daylight < 0.85 ? 1.12 : 0.9; // dusk and dawn favour wolves
-    const prob = Math.max(0.02, Math.min(0.95, p.huntSuccess * condition * packBonus * cover * light));
+    const prob = Math.max(0.02, Math.min(0.95, p.huntSuccess * condition * packBonus * cover * light * sim.weather.capture));
     if (sim.rng.chance(prob)) {
       // A chase counts once when it ends, in a kill or a give-up.
       sim.counters.hunts.attempts++;

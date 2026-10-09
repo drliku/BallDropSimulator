@@ -4,6 +4,7 @@ import { ControllerContext } from './runtime/context';
 import { Controller, SPEEDS } from './runtime/controller';
 import { Chart } from './ui/Chart';
 import { Header, ViewToolbar } from './ui/Header';
+import { HuntBanner, HuntToasts } from './ui/Hunts';
 import { LeftPanel } from './ui/LeftPanel';
 import { RightPanel } from './ui/RightPanel';
 
@@ -21,6 +22,7 @@ export default function App() {
       else if (e.key >= '1' && e.key <= '4') controller.setSpeed(SPEEDS[Number(e.key) - 1]);
       else if (e.key === 'Escape') controller.deselect();
       else if (e.key === 'f' && controller.selectedId !== -1) controller.follow();
+      else if (e.key === 'h') controller.watchHunt();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -35,12 +37,14 @@ export default function App() {
           <main className="relative order-1 h-[52vh] min-h-[320px] overflow-hidden rounded-xl border border-white/[0.07] lg:order-none lg:h-auto" aria-label="3D forest view">
             <Scene controller={controller} />
             <ViewToolbar />
+            <HuntToasts />
+            <HuntBanner />
             <p className="pointer-events-none absolute bottom-2 left-3 text-[11px] text-white/60">Drag to orbit · scroll to zoom · right-drag to pan · click an animal to inspect</p>
           </main>
           <div className="order-3 h-[420px] lg:order-none lg:row-span-2 lg:h-auto lg:min-h-0 [&>aside]:h-full"><RightPanel /></div>
           <div className="order-4 h-[240px] min-w-0 lg:order-none lg:col-start-2 lg:row-start-2 lg:h-auto lg:min-h-0 [&>section]:h-full"><Chart /></div>
         </div>
-        <p className="px-1 text-[11px] text-ink-faint">Space play/pause · → step · 1–4 speed · F follow · Esc deselect. An agent-based model for exploring ideas, not a forecast of any real population.</p>
+        <p className="px-1 text-[11px] text-ink-faint">Space play/pause · → step · 1–4 speed · F follow · H watch a hunt · Esc deselect. An agent-based model for exploring ideas, not a forecast of any real population.</p>
       </div>
     </ControllerContext.Provider>
   );

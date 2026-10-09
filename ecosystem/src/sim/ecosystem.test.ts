@@ -139,4 +139,30 @@ describe('runtime controller', () => {
     fast.frame(1, 5000);
     expect(fast.sim.tick).toBe(t);
   });
+
+  it('weather at 0% stays clear; weather on changes and stays within bounds', () => {
+    const calm = make({}, { weather: 0 });
+    run(calm, 20);
+    expect(calm.weather.kind).toBe('clear');
+    expect(calm.weather.mix.rain).toBe(0);
+    const wild = make({}, { weather: 1 });
+    const kinds = new Set<string>();
+    for (let d = 0; d < 60; d++) {
+      run(wild, 1);
+      kinds.add(wild.weather.kind);
+      for (const v of Object.values(wild.weather.mix)) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1); }
+      expect(wild.weather.visibility).toBeGreaterThan(0.2);
+    }
+    expect(kinds.size).toBeGreaterThan(2);
+  });
+
+  it('hunt tracker agrees with the kill counter and announces hunts before they end', () => {
+    const sim = make();
+    run(sim, 25);
+    const kills = sim.hunts.results.filter((r) => r.outcome === 'kill').length;
+    // Results are capped at the last 30; the counter covers the whole run.
+    if (sim.counters.hunts.kills <= 30 && sim.hunts.resultSeq <= 30) expect(kills).toBe(sim.counters.hunts.kills);
+    expect(sim.hunts.startSeq).toBeGreaterThanOrEqual(sim.hunts.resultSeq);
+    for (const r of sim.hunts.results) expect(['kill', 'escaped', 'called off']).toContain(r.outcome);
+  });
 });

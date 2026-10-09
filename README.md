@@ -177,7 +177,17 @@ npm run sim -- balanced 200 7    # headless run: scenario, days, seed; prints a 
     measured energy flows, and the Lotka–Volterra comparison.
   - Bottom: the population graph, with hover, range, pause, clear, series toggles and saved runs drawn
     as dashed lines.
-  - Shortcuts: Space play/pause, → step, 1–4 speed, F follow, Esc deselect.
+  - **Hunts are announced.** When a pack starts stalking, the target deer gets an amber ring, arrow and
+    label, with lines from each wolf, and a banner offers ▶ Watch (slows to 1× and follows the deer). The
+    marker turns red when the chase begins. A kill sends up a red column; an escape shows a green ring.
+    **Hunt cam** follows every new hunt automatically. Wolves now creep in for about 2 s (at 1×) before
+    the rush unless the deer bolts first, so there is time to look.
+  - **Dynamic weather** (`src/sim/weather.ts`): clear, overcast, rain, thunderstorms with lightning,
+    fog and snow in winter. It runs as a seasonal Markov chain on its own seeded stream. Rain speeds plant
+    growth and eases deer thirst; fog, rain and snow shorten sight; snow and storms slow animals; snow
+    makes deer easier to catch. The Environment tab shows the current effects and has a
+    "Weather variability" slider (0% keeps the sky clear).
+  - Shortcuts: Space play/pause, → step, 1–4 speed, F follow, H watch a hunt, Esc deselect.
 - **Validation** (`src/sim/ecosystem.test.ts`) checks that:
   - animals with no food starve;
   - wolves without meat gain nothing;
@@ -192,10 +202,9 @@ npm run sim -- balanced 200 7    # headless run: scenario, days, seed; prints a 
 **Simplifications and limitations**:
 - **Time is compressed.** A tick is about 12 ecological minutes but about one second of movement. Lifespans
   are 95 days for deer and 170 days for wolves, and a "year" is 100 days, so cycles play out in minutes.
-- **Outcomes depend on the seed.** In headless runs with default settings:
-  - seeds 7 and 99 kept both species for 400+ days;
-  - seed 20241 cycled and then lost its wolves;
-  - seed 5 crashed.
+- **Outcomes depend on the seed.** In headless runs with default settings (weather on):
+  - seeds 7, 5 and 20241 kept both species for 300 days;
+  - seed 99 overshot on wolves, and both species died out by about day 250.
   Small populations are fragile, as in real ecology. Treat a single run as one possible history, not a
   prediction.
 - **Simplified biology:**

@@ -101,9 +101,9 @@ export class Vegetation {
   }
 
   /** Advance plant growth by dtDays. Returns biomass produced. */
-  grow(dtDays: number, day: number, p: Params): number {
+  grow(dtDays: number, day: number, p: Params, weatherMul = 1): number {
     const S = seasonFactor(day, p.seasonality);
-    const r = p.vegGrowth * S;
+    const r = p.vegGrowth * S * weatherMul;
     let produced = 0;
     for (let c = 0; c < this.n; c++) {
       const K = this.K[c];

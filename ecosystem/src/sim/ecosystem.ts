@@ -15,6 +15,8 @@ import { DAY_START, HALF, TICKS_PER_DAY, cellIndex, getWorld, type World } from 
 import { updateDeer, updateWolf } from './behavior';
 import { History } from './history';
 import { HeatMaps } from './heatmaps';
+import { HuntTracker } from './hunts';
+import { WEATHER_LABEL, Weather } from './weather';
 
 export type Cause = Exclude<DeathCause, 'removed'>;
 const CAUSES: Cause[] = ['predation', 'starvation', 'dehydration', 'old age', 'natural'];
@@ -61,6 +63,8 @@ export class Ecosystem {
   flows: DayFlows[] = [];
   history!: History;
   heat!: HeatMaps;
+  weather!: Weather;
+  hunts = new HuntTracker();
   events: SimEvent[] = [];
   extinct = { deer: -1, wolf: -1 };
   private nextId = 1;
@@ -99,6 +103,8 @@ export class Ecosystem {
       hunts: { attempts: 0, kills: 0 },
     };
     this.flows = [emptyFlows()];
+    this.weather = new Weather(this.setup.seed);
+    this.hunts = new HuntTracker();
     this.veg = new Vegetation(this.world);
     this.veg.refresh(this.params, true);
     this.veg.fill(0.7);
@@ -137,11 +143,13 @@ export class Ecosystem {
     this.tick++;
     this.daylight = this.computeDaylight();
     const flows = this.flows[this.flows.length - 1];
+    const newWeather = this.weather.step(this.day, this.params);
+    if (newWeather) this.log('info', `Weather: ${WEATHER_LABEL[newWeather].toLowerCase()}.`);
 
     // Plants grow every 4 ticks.
     if (this.tick % 4 === 0) {
       this.veg.refresh(this.params);
-      flows.vegProduced += this.veg.grow(4 / TICKS_PER_DAY, this.day, this.params);
+      flows.vegProduced += this.veg.grow(4 / TICKS_PER_DAY, this.day, this.params, this.weather.growth);
     }
 
     // Spatial indices
@@ -163,6 +171,8 @@ export class Ecosystem {
       if (!a.alive) continue;
       if (a.species === 'deer') updateDeer(this, a); else updateWolf(this, a);
     }
+
+    this.hunts.update(this);
 
     // Carcasses decay (scavengers, insects, weather).
     for (const c of this.carcasses) {

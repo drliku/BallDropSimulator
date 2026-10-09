@@ -20,6 +20,7 @@ export interface Params {
   water: number;
   habitat: number;
   seasonality: number;
+  weather: number;
 }
 
 export interface Setup {
@@ -44,6 +45,7 @@ export const DEFAULT_PARAMS: Params = {
   water: 1,
   habitat: 1,
   seasonality: 0.35,
+  weather: 0.6,
 };
 
 export const DEFAULT_SETUP: Setup = { seed: 7, initialDeer: 160, initialWolves: 14 };
@@ -79,4 +81,5 @@ export const PARAM_META: Record<keyof Params, ParamMeta> = {
   water: { label: 'Water availability', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'How full the streams and pond are. Low water shrinks drinking spots and the moist ground around them.' },
   habitat: { label: 'Habitat quality', group: 'environment', min: 0.3, max: 1.6, step: 0.05, format: x, help: 'Scales plant carrying capacity across the landscape (soil fertility).' },
   seasonality: { label: 'Seasonal variation', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'Amplitude of the yearly cycle in plant growth (100-day year). At 100% growth stops completely in mid-winter.' },
+  weather: { label: 'Weather variability', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'How often and how strongly rain, storms, fog and snow roll in. Rain speeds plant growth; fog and rain shorten sight; snow slows animals and helps wolves. 0% keeps the sky clear.' },
 };

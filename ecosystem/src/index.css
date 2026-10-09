@@ -37,3 +37,14 @@ input[type='range']::-moz-range-thumb { width: 10px; height: 10px; border-radius
 
 .scroll-thin::-webkit-scrollbar { width: 6px; }
 .scroll-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+/* Hunt markers in the 3D view */
+.hunt-label { white-space: nowrap; padding: 2px 8px; border-radius: 6px; font: 600 11px/1.5 'Saira', sans-serif; letter-spacing: 0.06em; color: #1b1205; background: #ffb02e; box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 16px rgba(255,176,46,0.6); }
+.hunt-label[data-phase='chase'] { color: #fff; background: #ff3b30; box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 22px rgba(255,59,48,0.9); animation: hunt-throb 0.45s ease-in-out infinite alternate; }
+.hunt-label:empty, .hunt-burst:empty { display: none; }
+.hunt-burst { white-space: nowrap; font: 400 22px/1 'Brain', 'Saira Semi Condensed', sans-serif; letter-spacing: 0.08em; color: #ff4b3a; text-shadow: 0 0 12px rgba(255,59,48,0.9), 0 2px 0 #000; }
+.hunt-burst[data-outcome='escaped'] { color: #6ff09a; text-shadow: 0 0 12px rgba(94,234,138,0.8), 0 2px 0 #000; }
+@keyframes hunt-throb { from { transform: scale(1); } to { transform: scale(1.12); } }
+@keyframes hunt-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.55); } 50% { box-shadow: 0 0 0 8px rgba(255,59,48,0); } }
+.hunt-banner-chase { animation: hunt-pulse 0.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .hunt-label[data-phase='chase'], .hunt-banner-chase { animation: none; } }

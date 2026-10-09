@@ -9,6 +9,8 @@ import { ControllerContext } from '../runtime/context';
 import { getWorld } from '../sim/world';
 import { AnimalHerd, Carcasses } from './Animals';
 import { Flora, Grass, HeatOverlay, Terrain, Water } from './World';
+import { HuntMarkers } from './Hunts';
+import { WeatherFX, weatherFx } from './Weather';
 
 const world = getWorld();
 
@@ -19,7 +21,10 @@ function Driver() {
   return null;
 }
 
-const SKY = { night: new THREE.Color('#0a1122'), dawn: new THREE.Color('#e4a272'), day: new THREE.Color('#9fc4e3') };
+const SKY = {
+  night: new THREE.Color('#0a1122'), dawn: new THREE.Color('#e4a272'), day: new THREE.Color('#9fc4e3'),
+  overcast: new THREE.Color('#8b959e'), overcastNight: new THREE.Color('#12161b'), storm: new THREE.Color('#3f474f'), fog: new THREE.Color('#b9c2c8'), flash: new THREE.Color('#e6ecff'),
+};
 
 /** Sun, moon, sky colour and fog from the model's time of day. */
 function Lighting() {
@@ -28,8 +33,9 @@ function Lighting() {
   const moon = useRef<THREE.DirectionalLight>(null);
   const hemi = useRef<THREE.HemisphereLight>(null);
   const stars = useRef<THREE.Points>(null);
-  const { scene } = useThree();
+  const { scene, camera, controls } = useThree();
   const bg = useMemo(() => new THREE.Color(), []);
+  const tmp = useMemo(() => new THREE.Color(), []);
   const fog = useMemo(() => new THREE.Fog('#9fc4e3', 160, 420), []);
   scene.fog = fog;
 
@@ -41,17 +47,31 @@ function Lighting() {
     const day = Math.min(1, Math.max(0, (elev + 0.12) / 0.4));
     const golden = Math.max(0, 1 - Math.abs(elev) / 0.35) * day;
     const ang = 2 * Math.PI * (t - 0.25);
+    const wm = ctl.sim.weather.mix;
+    const flash = weatherFx.flash;
     if (sun.current) {
       sun.current.position.set(Math.cos(ang) * 160, Math.max(8, Math.sin(ang) * 180), 60);
-      sun.current.intensity = 2.4 * day;
+      sun.current.intensity = 2.4 * day * (1 - 0.78 * wm.cloud);
       sun.current.color.setRGB(1, 0.85 + 0.15 * (1 - golden), 0.7 + 0.3 * (1 - golden));
     }
-    if (moon.current) moon.current.intensity = 0.35 * (1 - day);
-    if (hemi.current) hemi.current.intensity = 0.25 + 0.65 * day;
-    bg.copy(SKY.night).lerp(SKY.day, day).lerp(SKY.dawn, golden * 0.55);
+    if (moon.current) moon.current.intensity = 0.35 * (1 - day) * (1 - 0.8 * wm.cloud);
+    if (hemi.current) hemi.current.intensity = (0.4 + 0.5 * day) * (1 - 0.25 * wm.cloud) + 2.2 * flash;
+    bg.copy(SKY.night).lerp(SKY.day, day).lerp(SKY.dawn, golden * 0.55 * (1 - wm.cloud));
+    tmp.copy(SKY.overcastNight).lerp(SKY.overcast, day);
+    bg.lerp(tmp, wm.cloud * 0.85);
+    bg.lerp(SKY.storm, wm.storm * 0.6 * (0.3 + 0.7 * day));
+    tmp.copy(SKY.overcastNight).lerp(SKY.fog, day);
+    bg.lerp(tmp, wm.fog * 0.7);
+    bg.lerp(SKY.flash, flash * 0.55);
     scene.background = bg;
     fog.color.copy(bg);
-    if (stars.current) stars.current.visible = day < 0.4;
+    // Fog distances follow the camera so haze reads the same from close up and from above.
+    const target = (controls as unknown as { target?: THREE.Vector3 } | null)?.target;
+    const d = target ? camera.position.distanceTo(target) : 150;
+    const thick = Math.min(1, wm.fog + 0.35 * wm.rain + 0.3 * wm.snow);
+    fog.near = Math.max(4, d * (1.3 - 1.05 * thick));
+    fog.far = d + 300 * (1 - 0.82 * thick) + 20;
+    if (stars.current) stars.current.visible = day < 0.4 && wm.cloud < 0.5;
   });
 
   return (
@@ -211,6 +231,8 @@ export function Scene({ controller }: { controller: Controller }) {
         <AnimalHerd species="deer" />
         <AnimalHerd species="wolf" />
         <Carcasses />
+        <WeatherFX />
+        <HuntMarkers />
         <SelectionMarker />
         <CameraRig />
       </ControllerContext.Provider>
