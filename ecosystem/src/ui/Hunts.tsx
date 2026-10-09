@@ -1,4 +1,9 @@
 import { useUi } from '../runtime/context';
+import type { Hunt } from '../sim/hunts';
+import { speciesName } from '../sim/species';
+
+const hunters = (h: Hunt) => (h.predator === 'wolf' ? `Pack ${h.packId} (${h.wolfIds.length} ${h.wolfIds.length > 1 ? 'wolves' : 'wolf'})` : h.wolfIds.length > 1 ? `${h.wolfIds.length} ${speciesName(h.predator, 2)}` : `A ${speciesName(h.predator)}`);
+const preyName = (h: { prey: Hunt['prey']; deerId: number }) => `${speciesName(h.prey)} #${h.deerId}`;
 
 /** Banner that announces the hunt about to happen (or happening), with a one-click Watch. */
 export function HuntBanner() {
@@ -22,8 +27,8 @@ export function HuntBanner() {
             </div>
             <div className="truncate text-[12px] text-ink">
               {h.phase === 'chase'
-                ? `Pack ${h.packId} is running down deer #${h.deerId}: ${h.gap.toFixed(0)} m between them.`
-                : `Pack ${h.packId} (${h.wolfIds.length} ${h.wolfIds.length > 1 ? 'wolves' : 'wolf'}) is stalking deer #${h.deerId}, ${h.gap.toFixed(0)} m away.`}
+                ? `${hunters(h)} ${h.wolfIds.length > 1 ? 'are' : 'is'} running down ${preyName(h)}: ${h.gap.toFixed(0)} m between them.`
+                : `${hunters(h)} ${h.wolfIds.length > 1 ? 'are' : 'is'} stalking ${preyName(h)}, ${h.gap.toFixed(0)} m away.`}
               {others > 0 && <span className="text-ink-muted"> +{others} more hunt{others > 1 ? 's' : ''}</span>}
             </div>
           </div>
@@ -46,7 +51,9 @@ export function HuntToasts() {
         <div key={f.seq} className={`rounded-lg border px-2.5 py-1.5 text-[12px] shadow-lg backdrop-blur ${f.outcome === 'kill' ? 'border-[#ff3b30]/70 bg-[#3a0d0b]/90' : 'border-[#5eea8a]/60 bg-[#0d2a17]/90'}`}>
           <span className={`font-display text-[14px] uppercase tracking-[0.06em] ${f.outcome === 'kill' ? 'text-[#ff6b5e]' : 'text-[#6ff09a]'}`}>{f.outcome === 'kill' ? 'Kill' : 'Escaped'}</span>
           <span className="ml-2 text-ink">
-            {f.outcome === 'kill' ? `Pack ${f.packId} brought down deer #${f.deerId}.` : `Deer #${f.deerId} outran pack ${f.packId}.`}
+            {f.outcome === 'kill'
+              ? `${f.predator === 'wolf' ? `Pack ${f.packId}` : `A ${speciesName(f.predator)}`} caught ${preyName(f)}.`
+              : `${preyName(f)} got away from ${f.predator === 'wolf' ? `pack ${f.packId}` : `a ${speciesName(f.predator)}`}.`}
           </span>
         </div>
       ))}

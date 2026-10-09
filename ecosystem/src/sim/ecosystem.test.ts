@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { Ecosystem } from './ecosystem';
-import { DEFAULT_PARAMS, DEFAULT_SETUP, type Params, type Setup } from './params';
+import { DEFAULT_PARAMS, DEFAULT_SETUP, NO_FAUNA, type Params, type Setup } from './params';
+import { FAUNA_IDS, SPECIES, SPECIES_IDS } from './species';
 import { DEER_ENERGY_PER_BIOMASS } from './agents';
-import { TICKS_PER_DAY } from './world';
+import { HALF, TICKS_PER_DAY } from './world';
 
 const run = (sim: Ecosystem, days: number) => { for (let t = 0; t < days * TICKS_PER_DAY; t++) sim.step(); };
+/** Deer, wolves and plants only (the core model), unless other species are asked for. */
 const make = (setup: Partial<Setup> = {}, params: Partial<Params> = {}) =>
+  new Ecosystem({ ...DEFAULT_SETUP, fauna: NO_FAUNA, ...setup }, { ...DEFAULT_PARAMS, ...params });
+/** The full fourteen-species forest. */
+const full = (setup: Partial<Setup> = {}, params: Partial<Params> = {}) =>
   new Ecosystem({ ...DEFAULT_SETUP, ...setup }, { ...DEFAULT_PARAMS, ...params });
 
 describe('ecological rules', () => {
@@ -65,18 +70,19 @@ describe('ecological rules', () => {
     expect(f.deerGained).toBeCloseTo(f.vegEaten * DEER_ENERGY_PER_BIOMASS, 6);
   });
 
-  it('counters match the living agents and every death is recorded once', () => {
-    const sim = make();
+  it('counters match the living agents and every death is recorded once (all species)', () => {
+    const sim = full({}, { immigration: 1 });
     const seen = new Set<number>();
     const kill = sim.kill.bind(sim);
     let duplicate = false;
     sim.kill = (a, cause, by) => { if (a.alive) { if (seen.has(a.id)) duplicate = true; seen.add(a.id); } kill(a, cause, by); };
-    run(sim, 60);
+    run(sim, 30);
     sim.remove('deer', 5);
+    sim.remove('lynx', 'all');
     run(sim, 5);
     expect(duplicate).toBe(false);
-    for (const s of ['deer', 'wolf'] as const) {
-      const started = s === 'deer' ? sim.setup.initialDeer : sim.setup.initialWolves;
+    for (const s of SPECIES_IDS) {
+      const started = s === 'deer' ? sim.setup.initialDeer : s === 'wolf' ? sim.setup.initialWolves : sim.setup.fauna[s];
       const expected = started + sim.counters.births[s] + sim.counters.added[s] - sim.totalDeaths(s) - sim.counters.removed[s];
       expect(sim.count(s)).toBe(expected);
       expect(sim.animals.filter((a) => a.species === s).length).toBe(expected);
@@ -85,11 +91,11 @@ describe('ecological rules', () => {
   });
 
   it('animals stay inside the world', () => {
-    const sim = make();
+    const sim = full();
     run(sim, 30);
     for (const a of sim.animals) {
-      expect(Math.abs(a.x)).toBeLessThanOrEqual(99);
-      expect(Math.abs(a.z)).toBeLessThanOrEqual(99);
+      expect(Math.abs(a.x)).toBeLessThanOrEqual(HALF - 1);
+      expect(Math.abs(a.z)).toBeLessThanOrEqual(HALF - 1);
     }
   });
 
@@ -164,5 +170,68 @@ describe('runtime controller', () => {
     if (sim.counters.hunts.kills <= 30 && sim.hunts.resultSeq <= 30) expect(kills).toBe(sim.counters.hunts.kills);
     expect(sim.hunts.startSeq).toBeGreaterThanOrEqual(sim.hunts.resultSeq);
     for (const r of sim.hunts.results) expect(['kill', 'escaped', 'called off']).toContain(r.outcome);
+  });
+
+});
+
+describe('the wider fauna', () => {
+  const forest = full({ seed: 5 });
+  run(forest, 30.5); // ends at midday
+
+  it('every kill follows the food web, and kill records match predation deaths', () => {
+    for (const pred of SPECIES_IDS) {
+      for (const [prey, n] of Object.entries(forest.counters.predation[pred])) {
+        expect(SPECIES[pred].prey.map((p) => p.id)).toContain(prey);
+        expect(n).toBeGreaterThan(0);
+      }
+    }
+    for (const s of SPECIES_IDS) {
+      const recorded = SPECIES_IDS.reduce((sum, p) => sum + (forest.counters.predation[p][s] ?? 0), 0);
+      expect(recorded).toBe(forest.counters.deaths[s].predation);
+    }
+    // Several different predators actually hunted in 30 days.
+    const hunters = SPECIES_IDS.filter((p) => Object.keys(forest.counters.predation[p]).length > 0);
+    expect(hunters.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('every species is still present after 30 days', () => {
+    for (const id of SPECIES_IDS) expect(forest.count(id)).toBeGreaterThan(0);
+  });
+
+  it('birds fly and land; nothing else leaves the ground', () => {
+    const birds = forest.animals.filter((a) => a.species === 'eagle' || a.species === 'raven');
+    expect(birds.some((b) => b.alt > 5)).toBe(true);
+    for (const a of forest.animals) if (!SPECIES[a.species].flies) expect(a.alt).toBe(0);
+  });
+
+  it('bears hibernate through winter and wake in spring', () => {
+    const sim = make({ initialDeer: 40, initialWolves: 0, fauna: { ...NO_FAUNA, bear: 4 } }, { immigration: 0 });
+    run(sim, 72); // mid-winter
+    const bears = sim.animals.filter((a) => a.species === 'bear');
+    expect(bears.length).toBeGreaterThan(0);
+    expect(bears.filter((b) => b.state === 'hibernate').length).toBeGreaterThanOrEqual(Math.ceil(bears.length / 2));
+    run(sim, 26); // spring
+    expect(sim.animals.filter((a) => a.species === 'bear' && a.state === 'hibernate').length).toBe(0);
+  });
+
+  it('hares without predators stay bounded by territory and food', () => {
+    const sim = make({ initialDeer: 0, initialWolves: 0, fauna: { ...NO_FAUNA, hare: 120 } }, { immigration: 0 });
+    run(sim, 60);
+    expect(sim.count('hare')).toBeGreaterThan(20);
+    expect(sim.count('hare')).toBeLessThan(700);
+  });
+
+  it('immigration revives only the wider fauna, never deer or wolves; 0% keeps populations closed', () => {
+    const open = make({ initialDeer: 30, initialWolves: 0, fauna: { ...NO_FAUNA, lynx: 2 } }, { immigration: 1 });
+    open.remove('lynx', 'all');
+    run(open, 80);
+    expect(open.counters.added.lynx).toBeGreaterThan(0);
+    expect(open.count('wolf')).toBe(0);
+    const closed = make({ initialDeer: 30, initialWolves: 0, fauna: { ...NO_FAUNA, lynx: 2 } }, { immigration: 0 });
+    closed.remove('lynx', 'all');
+    run(closed, 40);
+    expect(closed.count('lynx')).toBe(0);
+    expect(closed.counters.added.lynx).toBe(0);
+    for (const id of FAUNA_IDS) if (id !== 'lynx') expect(closed.count(id)).toBe(0);
   });
 });

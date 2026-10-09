@@ -2,15 +2,15 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useController } from '../runtime/context';
-import { getWorld } from '../sim/world';
+import { HALF, getWorld } from '../sim/world';
 
 const world = getWorld();
 
 /** Render-only weather state shared with the lighting (lightning flashes). */
 export const weatherFx = { flash: 0 };
 
-const RAIN_N = 3200, SNOW_N = 2600;
-const BOX = 140, HEIGHT = 60;
+const RAIN_N = 4500, SNOW_N = 3600;
+const BOX = 170, HEIGHT = 70;
 
 function rand(seed: number) {
   let s = seed;
@@ -138,7 +138,7 @@ function Lightning() {
       weatherFx.flash = 1;
       const f = focus();
       const ang = Math.random() * Math.PI * 2, r = 40 + Math.random() * 60;
-      let x = THREE.MathUtils.clamp(f.x + Math.cos(ang) * r, -95, 95), z = THREE.MathUtils.clamp(f.z + Math.sin(ang) * r, -95, 95);
+      let x = THREE.MathUtils.clamp(f.x + Math.cos(ang) * r, -HALF + 5, HALF - 5), z = THREE.MathUtils.clamp(f.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
       const ground = world.heightAt(x, z);
       const pos = geo.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i <= SEG; i++) {

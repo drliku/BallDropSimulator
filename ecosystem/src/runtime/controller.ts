@@ -15,6 +15,8 @@ import { DEFAULT_PARAMS, DEFAULT_SETUP, type Params, type Setup } from '../sim/p
 import { randomSeed } from '../sim/rng';
 import type { SeriesKey } from '../sim/history';
 import type { HuntResult, HuntTracker } from '../sim/hunts';
+import type { Species } from '../sim/agents';
+import type { FaunaId } from '../sim/species';
 
 export const TICKS_PER_SECOND = 10;
 export const SPEEDS = [1, 2, 5, 10] as const;
@@ -84,7 +86,7 @@ export class Controller {
   private lastEmit = 0;
 
   constructor() {
-    this.setup = { ...DEFAULT_SETUP };
+    this.setup = { ...DEFAULT_SETUP, fauna: { ...DEFAULT_SETUP.fauna } };
     this.sim = new Ecosystem(this.setup, DEFAULT_PARAMS);
     this.markExperiment('balanced');
   }
@@ -154,7 +156,10 @@ export class Controller {
 
   addDeer(n: number) { this.sim.addDeer(n); this.emit(); }
   addWolves(n: number) { this.sim.addWolves(n); this.emit(); }
-  remove(species: 'deer' | 'wolf', n: number | 'all') { this.sim.remove(species, n); this.emit(); }
+  remove(species: Species, n: number | 'all') { this.sim.remove(species, n); this.emit(); }
+  addFauna(id: FaunaId, n: number) { this.sim.addFauna(id, n); this.emit(); }
+  /** Initial number of one of the other species, used at the next reset. */
+  setFauna(id: FaunaId, n: number) { this.setup = { ...this.setup, fauna: { ...this.setup.fauna, [id]: n } }; this.emit(); }
 
   // ------------------------------------------------------------------ experiments
 
@@ -164,7 +169,7 @@ export class Controller {
       exp.onStart?.(this.sim);
       this.markExperiment(id);
     } else {
-      this.setup = { ...this.setup, ...DEFAULT_SETUP, seed: this.setup.seed, ...exp.setup };
+      this.setup = { ...DEFAULT_SETUP, seed: this.setup.seed, ...exp.setup, fauna: { ...(exp.setup?.fauna ?? DEFAULT_SETUP.fauna) } };
       this.sim.reset(this.setup, { ...DEFAULT_PARAMS, ...exp.params });
       exp.onStart?.(this.sim);
       this.acc = 0;

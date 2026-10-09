@@ -70,7 +70,7 @@ export class Vegetation {
     const w = this.world;
     const waterCells: number[] = [];
     for (let c = 0; c < this.n; c++) {
-      const isWater = w.streamDist[c] < streamHalfWidth || w.pondDist[c] < pondRadius;
+      const isWater = (streamHalfWidth > 0 && w.streamDist[c] < streamHalfWidth) || (pondRadius > 0 && w.pondDist[c] < pondRadius);
       this.water[c] = isWater ? 1 : 0;
       if (isWater) waterCells.push(c);
     }

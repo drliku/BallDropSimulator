@@ -4,6 +4,7 @@ import { EXPERIMENTS } from '../sim/experiments';
 import { PARAM_META, type ParamGroup, type Params } from '../sim/params';
 import { experimentOutcomes } from './outcomes';
 import { WEATHER_ICON, WEATHER_LABEL } from '../sim/weather';
+import { FAUNA_IDS, SPECIES } from '../sim/species';
 
 type Tab = 'experiments' | 'populations' | 'biology' | 'environment' | 'runs';
 const TABS: { id: Tab; label: string }[] = [
@@ -92,6 +93,28 @@ function Populations() {
           <button type="button" className="btn" onClick={() => ctl.remove('deer', 25)}>Remove 25 deer</button>
         </div>
         <p className="text-[12px] text-ink-faint">Added wolves arrive as new packs; added deer as small herds. Removals are recorded separately from deaths.</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <h3 className="h-title text-[14px]">Other species</h3>
+        <p className="text-[12px] leading-snug text-ink-faint">Starting numbers apply at the next reset; the buttons act on the current run.</p>
+        {FAUNA_IDS.map((id) => {
+          const S = SPECIES[id];
+          const now = ctl.sim.count(id);
+          return (
+            <div key={id} className="rounded-md border border-white/[0.06] px-2 py-1.5" title={S.blurb}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-ink"><i className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: S.color }} /><span className="truncate">{S.name}</span><span className="font-mono text-ink-faint">({now})</span></span>
+                <span className="flex shrink-0 gap-1">
+                  <button type="button" className="chip h-6 px-1.5" onClick={() => ctl.addFauna(id, S.groupSize[1] > 2 ? 4 : 2)} aria-label={`Add ${S.plural}`}>+{S.groupSize[1] > 2 ? 4 : 2}</button>
+                  <button type="button" className="chip h-6 px-1.5" onClick={() => ctl.remove(id, 'all')} aria-label={`Remove all ${S.plural}`} disabled={now === 0}>✕</button>
+                </span>
+              </div>
+              <input type="range" min={0} max={S.maxInitial} step={1} value={ctl.setup.fauna[id]} aria-label={`Initial ${S.plural}`}
+                style={{ ['--pct' as string]: `${(ctl.setup.fauna[id] / S.maxInitial) * 100}%` }} onChange={(e) => ctl.setFauna(id, Number(e.target.value))} />
+              <div className="-mt-1 text-right font-mono text-[10.5px] text-ink-faint">start with {ctl.setup.fauna[id]}</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,10 +1,14 @@
 /** Animal data and species traits. All rates are per simulation tick (1/120 day) unless noted. */
+import { DEER, SPECIES, WOLF, type SpeciesId } from './species';
 
-export type Species = 'deer' | 'wolf';
+export { DEER, WOLF };
+export type Species = SpeciesId;
 export type Sex = 'F' | 'M';
 export type DeerState = 'wander' | 'seekFood' | 'graze' | 'seekWater' | 'drink' | 'rest' | 'alert' | 'flee' | 'herd' | 'mate';
 export type WolfState = 'rest' | 'patrol' | 'search' | 'stalk' | 'chase' | 'eat' | 'pack' | 'mate' | 'recover';
-export type State = DeerState | WolfState;
+/** Extra states used by the other species. */
+export type FaunaState = 'hibernate' | 'follow';
+export type State = DeerState | WolfState | FaunaState;
 export type DeathCause = 'predation' | 'starvation' | 'dehydration' | 'old age' | 'natural' | 'removed';
 
 export interface Animal {
@@ -18,6 +22,8 @@ export interface Animal {
   heading: number; pheading: number;
   speed: number;
   gait: number;
+  /** Height above the ground (m); only birds leave it. */
+  alt: number;
   // Physiology
   energy: number;
   hydration: number;
@@ -66,21 +72,7 @@ export interface Traits {
   radius: number;         // body radius for spacing (m)
 }
 
-export const DEER: Traits = {
-  maxEnergy: 100, walk: 0.2, trot: 0.45, sprint: 0.95, turn: 0.26, accel: 0.09,
-  basal: 0.038, moveCost: 0.05, sprintDrain: 1.5, staminaRegen: 0.55,
-  maturity: 15, lifespan: 95, lifespanSd: 10, gestation: 7, cooldown: 8,
-  reproEnergy: 62, birthCost: 26, newbornEnergy: 48, bodyMeat: 110, radius: 0.55,
-};
-
-export const WOLF: Traits = {
-  maxEnergy: 100, walk: 0.24, trot: 0.52, sprint: 0.9, turn: 0.22, accel: 0.08,
-  basal: 0.044, moveCost: 0.06, sprintDrain: 0.95, staminaRegen: 0.42,
-  maturity: 26, lifespan: 170, lifespanSd: 18, gestation: 12, cooldown: 22,
-  reproEnergy: 66, birthCost: 16, newbornEnergy: 52, bodyMeat: 0, radius: 0.5,
-};
-
-export const traitsOf = (s: Species) => (s === 'deer' ? DEER : WOLF);
+export const traitsOf = (s: Species) => SPECIES[s].traits;
 
 /** Deer: grams of plant biomass turned into energy. */
 export const DEER_GRAZE_RATE = 0.5;        // biomass per tick while grazing
@@ -91,7 +83,7 @@ export const DEER_DRINK_RATE = 5;
 export const WOLF_EAT_RATE = 1.6;
 export const CARCASS_DECAY = 0.05;          // meat lost per tick to scavengers and decay (≈6 per day)
 
-export interface Carcass { id: number; x: number; z: number; meat: number; initialMeat: number; ageTicks: number; predation: boolean }
+export interface Carcass { id: number; x: number; z: number; meat: number; initialMeat: number; ageTicks: number; predation: boolean; species: Species }
 
 export interface Pack { id: number; leaderId: number; breederId: number; breeder2Id: number; targetId: number; homeX: number; homeZ: number; size: number }
 

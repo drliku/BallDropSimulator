@@ -7,6 +7,8 @@
  * per real second; the rules per tick never change.
  */
 import { DEER, WOLF, CARCASS_DECAY, traitsOf, type Animal, type Carcass, type DeathCause, type Pack, type Sex, type Species } from './agents';
+import { FAUNA_IDS, SPECIES, SPECIES_IDS, speciesName, type FaunaId } from './species';
+import { updateCritter } from './fauna';
 import { DEFAULT_PARAMS, DEFAULT_SETUP, type Params, type Setup } from './params';
 import { Rng } from './rng';
 import { SpatialHash } from './spatial';
@@ -22,12 +24,16 @@ export type Cause = Exclude<DeathCause, 'removed'>;
 const CAUSES: Cause[] = ['predation', 'starvation', 'dehydration', 'old age', 'natural'];
 
 export interface Counters {
-  births: { deer: number; wolf: number };
-  deaths: { deer: Record<Cause, number>; wolf: Record<Cause, number> };
-  removed: { deer: number; wolf: number };
-  added: { deer: number; wolf: number };
+  births: Record<Species, number>;
+  deaths: Record<Species, Record<Cause, number>>;
+  removed: Record<Species, number>;
+  added: Record<Species, number>;
+  /** Wolf hunts only (the core predator–prey pair). */
   hunts: { attempts: number; kills: number };
+  /** Kills by predator species and prey species, for every species. */
+  predation: Record<Species, Partial<Record<Species, number>>>;
 }
+const perSpecies = <T>(f: () => T) => Object.fromEntries(SPECIES_IDS.map((id) => [id, f()])) as Record<Species, T>;
 
 /** Energy and biomass flows, accumulated per model day. */
 export interface DayFlows {
@@ -57,8 +63,10 @@ export class Ecosystem {
   byId = new Map<number, Animal>();
   carcasses: Carcass[] = [];
   packs = new Map<number, Pack>();
-  deerHash = new SpatialHash(8);
-  wolfHash = new SpatialHash(8);
+  /** One neighbour index per species, rebuilt every tick. */
+  hashes = Object.fromEntries(SPECIES_IDS.map((id) => [id, new SpatialHash(8)])) as Record<Species, SpatialHash>;
+  get deerHash() { return this.hashes.deer; }
+  get wolfHash() { return this.hashes.wolf; }
   counters!: Counters;
   flows: DayFlows[] = [];
   history!: History;
@@ -66,7 +74,7 @@ export class Ecosystem {
   weather!: Weather;
   hunts = new HuntTracker();
   events: SimEvent[] = [];
-  extinct = { deer: -1, wolf: -1 };
+  extinct = perSpecies(() => -1);
   private nextId = 1;
   private nextCarcassId = 1;
   private nextPackId = 1;
@@ -94,13 +102,14 @@ export class Ecosystem {
     this.packs.clear();
     this.nextId = 1; this.nextCarcassId = 1; this.nextPackId = 1;
     this.events = [];
-    this.extinct = { deer: -1, wolf: -1 };
+    this.extinct = perSpecies(() => -1);
     this.counters = {
-      births: { deer: 0, wolf: 0 },
-      deaths: { deer: zeroCauses(), wolf: zeroCauses() },
-      removed: { deer: 0, wolf: 0 },
-      added: { deer: 0, wolf: 0 },
+      births: perSpecies(() => 0),
+      deaths: perSpecies(zeroCauses),
+      removed: perSpecies(() => 0),
+      added: perSpecies(() => 0),
       hunts: { attempts: 0, kills: 0 },
+      predation: perSpecies(() => ({})),
     };
     this.flows = [emptyFlows()];
     this.weather = new Weather(this.setup.seed);
@@ -111,6 +120,7 @@ export class Ecosystem {
     this.daylight = this.computeDaylight();
     this.spawnDeer(this.setup.initialDeer, true);
     this.spawnWolves(this.setup.initialWolves, true);
+    for (const id of FAUNA_IDS) this.spawnFauna(id, this.setup.fauna?.[id] ?? 0, true);
     this.history = new History();
     this.heat = new HeatMaps();
     this.heat.update(this, true);
@@ -153,14 +163,13 @@ export class Ecosystem {
     }
 
     // Spatial indices
-    this.deerHash.clear();
-    this.wolfHash.clear();
+    for (const id of SPECIES_IDS) this.hashes[id].clear();
     for (let i = 0; i < this.animals.length; i++) {
       const a = this.animals[i];
       a.px = a.x; a.pz = a.z; a.pheading = a.heading;
-      (a.species === 'deer' ? this.deerHash : this.wolfHash).insert(i, a.x, a.z);
+      this.hashes[a.species].insert(i, a.x, a.z);
     }
-    if (this.tick % TICKS_PER_DAY === 0) this.maintainPacks();
+    if (this.tick % TICKS_PER_DAY === 0) { this.maintainPacks(); this.immigrate(); }
 
     // Animals act in array order (deterministic).
     const n = this.animals.length;
@@ -169,7 +178,7 @@ export class Ecosystem {
       if (!a.alive) continue;
       this.lifecycle(a);
       if (!a.alive) continue;
-      if (a.species === 'deer') updateDeer(this, a); else updateWolf(this, a);
+      if (a.species === 'deer') updateDeer(this, a); else if (a.species === 'wolf') updateWolf(this, a); else updateCritter(this, a);
     }
 
     this.hunts.update(this);
@@ -209,8 +218,9 @@ export class Ecosystem {
       if (a.pregnantDays <= 0) { a.pregnantDays = -1; this.giveBirth(a); }
     }
     if (a.age >= a.lifespan) { this.kill(a, 'old age'); return; }
-    if (a.energy <= 0) { this.kill(a, a.species === 'deer' && a.hydration <= 0 ? 'dehydration' : 'starvation'); return; }
-    if (a.species === 'deer' && a.dryTicks > TICKS_PER_DAY * 3) { this.kill(a, 'dehydration'); return; }
+    const drinks = SPECIES[a.species].thirst > 0;
+    if (a.energy <= 0) { this.kill(a, drinks && a.hydration <= 0 ? 'dehydration' : 'starvation'); return; }
+    if (drinks && a.dryTicks > TICKS_PER_DAY * 3) { this.kill(a, 'dehydration'); return; }
     // Background mortality once a day per animal, rising steeply with age.
     if ((this.tick + a.id) % TICKS_PER_DAY === 0) {
       const ageFrac = a.age / a.lifespan;
@@ -229,9 +239,9 @@ export class Ecosystem {
     const heading = this.rng.range(-Math.PI, Math.PI);
     const a: Animal = {
       id: this.nextId++, species, sex, parentId: -1, generation: 0,
-      x, z, px: x, pz: z, heading, pheading: heading, speed: 0, gait: this.rng.next() * 6,
+      x, z, px: x, pz: z, heading, pheading: heading, speed: 0, gait: this.rng.next() * 6, alt: 0,
       energy: 70, hydration: 85, stamina: 100, age: 0, lifespan, pregnantDays: -1, cooldown: 0, dryTicks: 0,
-      state: species === 'deer' ? 'wander' : 'patrol', stateTicks: 0, decideIn: this.rng.int(0, 10),
+      state: species === 'wolf' ? 'patrol' : 'wander', stateTicks: 0, decideIn: this.rng.int(0, 10),
       tx: x, tz: z, targetId: -1, fleeX: 0, fleeZ: 0, lastThreatTick: -1000, escapeTicks: 0, attemptCooldown: 0,
       packId: -1, kills: 0, offspring: 0, alive: true, cause: null,
       ...opts,
@@ -308,7 +318,78 @@ export class Ecosystem {
     if (!initial) { this.counters.added.wolf += n; this.log('info', `${n} wolves added in new packs.`); }
   }
 
+  /** Other species arrive in their natural group sizes, in places that suit them. */
+  spawnFauna(id: FaunaId, n: number, initial = false) {
+    const S = SPECIES[id], T = S.traits;
+    let left = n;
+    while (left > 0) {
+      const size = Math.min(left, this.rng.int(S.groupSize[0], S.groupSize[1]));
+      const centre = this.habitatPoint(id);
+      for (let k = 0; k < size; k++) {
+        const p = this.randomOpenPoint(centre.x, centre.z, S.social === 'solitary' ? 3 : 8);
+        const a = this.makeAnimal(id, p.x, p.z, {
+          age: this.rng.range(T.maturity * 0.5, T.lifespan * 0.65),
+          energy: this.rng.range(60, 90),
+          hydration: this.rng.range(80, 100),
+          state: S.hibernates && this.isWinter ? 'hibernate' : 'wander',
+        });
+        if (S.flies) a.alt = S.flies.cruise * this.rng.range(0.6, 1);
+        if (size > 1 && k < 2) a.sex = k === 0 ? 'F' : 'M';
+      }
+      left -= size;
+    }
+    if (!initial && n > 0) { this.counters.added[id] += n; this.log('info', `${n} ${speciesName(id, n)} added.`); }
+  }
+
+  /**
+   * Open populations: once a day, a species of the wider fauna that is down to its last one or
+   * two animals may receive a newcomer (a pair, so it can breed) from beyond the valley edge.
+   */
+  private immigrate() {
+    const rate = this.params.immigration;
+    if (rate <= 0) return;
+    for (const id of FAUNA_IDS) {
+      if (!this.everHad(id) || this.count(id) > 1) continue;
+      if (!this.rng.chance(0.12 * rate)) continue;
+      const S = SPECIES[id], T = S.traits;
+      const side = this.rng.int(0, 3), t = this.rng.range(-HALF + 20, HALF - 20), e = HALF - 8;
+      const edge = side === 0 ? { x: -e, z: t } : side === 1 ? { x: e, z: t } : side === 2 ? { x: t, z: -e } : { x: t, z: e };
+      for (let k = 0; k < 2; k++) {
+        const p = this.randomOpenPoint(edge.x, edge.z, 6);
+        const a = this.makeAnimal(id, p.x, p.z, { age: T.maturity * this.rng.range(1.05, 1.6), energy: 80, hydration: 90 });
+        a.sex = k === 0 ? 'F' : 'M';
+        if (S.flies) a.alt = S.flies.cruise;
+      }
+      this.counters.added[id] += 2;
+      this.log('info', `Two ${S.plural} wandered in from outside the valley.`);
+    }
+  }
+
+  /** A random open point in the habitat a species prefers. */
+  habitatPoint(id: Species): { x: number; z: number } {
+    const S = SPECIES[id];
+    const hab = S.waterBound ? 'water' : S.plants?.habitat ?? (S.id === 'lynx' || S.id === 'squirrel' ? 'forest' : 'any');
+    let best = this.randomOpenPoint(), bestScore = -1;
+    for (let k = 0; k < 8; k++) {
+      const p = this.randomOpenPoint();
+      const c = cellIndex(p.x, p.z);
+      const f = this.world.forest[c];
+      const wd = this.veg.waterDist[c];
+      const score = hab === 'open' ? 1 - f : hab === 'forest' ? f : hab === 'edge' ? 1 - Math.abs(f - 0.4) * 2 : hab === 'water' ? Math.exp(-wd / 8) : this.rng.next();
+      if (score > bestScore) { bestScore = score; best = p; }
+    }
+    if (hab === 'water' && Number.isFinite(this.veg.waterDist[cellIndex(best.x, best.z)])) {
+      const c = cellIndex(best.x, best.z);
+      const wx = this.veg.nearestWaterX[c], wz = this.veg.nearestWaterZ[c];
+      return this.randomOpenPoint(wx, wz, 6);
+    }
+    return best;
+  }
+
+  get isWinter() { return this.params.seasonality > 0.05 && (((this.day % 100) + 100) % 100) / 100 >= 0.625 && (((this.day % 100) + 100) % 100) / 100 < 0.875; }
+
   private giveBirth(mother: Animal) {
+    if (mother.species !== 'deer' && mother.species !== 'wolf') { this.giveBirthFauna(mother); return; }
     const T = traitsOf(mother.species);
     // Deer: twins are common in well-fed does. Wolves: litter size grows with condition.
     let litter = mother.species === 'deer'
@@ -337,6 +418,27 @@ export class Ecosystem {
     if (mother.species === 'wolf') this.log('birth', `Wolf #${mother.id} gave birth to ${litter} pup${litter > 1 ? 's' : ''} in pack ${mother.packId}.`);
   }
 
+  private giveBirthFauna(mother: Animal) {
+    const S = SPECIES[mother.species], T = S.traits;
+    if (mother.energy < T.birthCost + 4) { mother.cooldown = T.cooldown * 0.5; return; }
+    let litter = this.rng.int(S.litter[0], S.litter[1]);
+    litter = Math.min(litter, Math.max(1, Math.floor((mother.energy - 30) / T.birthCost)));
+    for (let k = 0; k < litter; k++) {
+      mother.energy -= T.birthCost;
+      const young = this.makeAnimal(mother.species, mother.x + this.rng.range(-0.6, 0.6), mother.z + this.rng.range(-0.6, 0.6), {
+        energy: T.newbornEnergy, hydration: 85, parentId: mother.id, generation: mother.generation + 1, state: 'follow',
+        alt: mother.alt,
+      });
+      young.heading = mother.heading;
+      mother.offspring++;
+      this.counters.births[mother.species]++;
+    }
+    mother.cooldown = T.cooldown;
+    if (S.role === 'predator' || mother.species === 'bear' || mother.species === 'moose') {
+      this.log('birth', `A ${speciesName(mother.species)} gave birth to ${litter} young.`);
+    }
+  }
+
   /** The single place an animal dies. Records the death exactly once. */
   kill(a: Animal, cause: DeathCause, by?: Animal) {
     if (!a.alive) return;
@@ -344,18 +446,23 @@ export class Ecosystem {
     a.cause = cause;
     if (cause === 'removed') this.counters.removed[a.species]++;
     else this.counters.deaths[a.species][cause]++;
-    if (a.species === 'deer' && cause !== 'removed') {
-      const T = DEER;
+    const T = traitsOf(a.species);
+    if (T.bodyMeat > 0 && cause !== 'removed') {
       const size = a.age < T.maturity ? 0.5 : 1;
       const meat = T.bodyMeat * size * (cause === 'predation' ? 1 : 0.6);
-      this.carcasses.push({ id: this.nextCarcassId++, x: a.x, z: a.z, meat, initialMeat: meat, ageTicks: 0, predation: cause === 'predation' });
-      this.flows[this.flows.length - 1].meatProduced += meat;
+      this.carcasses.push({ id: this.nextCarcassId++, x: a.x, z: a.z, meat, initialMeat: meat, ageTicks: 0, predation: cause === 'predation', species: a.species });
+      if (a.species === 'deer') this.flows[this.flows.length - 1].meatProduced += meat;
     }
     if (cause === 'predation' && by) {
-      this.log('hunt', `Wolf #${by.id} (pack ${by.packId}) brought down deer #${a.id}.`);
+      const row = this.counters.predation[by.species];
+      row[a.species] = (row[a.species] ?? 0) + 1;
+      const who = by.species === 'wolf' ? `Wolf #${by.id} (pack ${by.packId})` : `A ${speciesName(by.species)} (#${by.id})`;
+      const young = a.age < T.maturity && a.species !== 'hare' && a.species !== 'squirrel' ? ' young' : '';
+      // Small prey are logged only now and then, so the field notes stay readable.
+      if (T.bodyMeat >= 20 || this.rng.chance(0.2)) this.log('hunt', `${who} brought down a${young} ${speciesName(a.species)} (#${a.id}).`);
       this.heat.addKill(a.x, a.z);
-    } else if (a.species === 'wolf' && cause !== 'removed') {
-      this.log('death', `Wolf #${a.id} died (${cause}).`);
+    } else if ((a.species === 'wolf' || SPECIES[a.species].role === 'predator' || a.species === 'bear') && cause !== 'removed') {
+      this.log('death', `${speciesName(a.species)[0].toUpperCase()}${speciesName(a.species).slice(1)} #${a.id} died (${cause}).`);
     }
   }
 
@@ -434,6 +541,7 @@ export class Ecosystem {
 
   addDeer(n: number) { this.spawnDeer(n); }
   addWolves(n: number) { this.spawnWolves(n); }
+  addFauna(id: FaunaId, n: number) { this.spawnFauna(id, n); }
 
   remove(species: Species, n: number | 'all') {
     const list = this.animals.filter((a) => a.alive && a.species === species);
@@ -446,7 +554,7 @@ export class Ecosystem {
     this.animals = this.animals.filter((a) => a.alive);
     for (const [id, a] of this.byId) if (!a.alive) this.byId.delete(id);
     if (species === 'wolf') this.maintainPacks();
-    if (count) this.log('info', `${count} ${species === 'deer' ? 'deer' : count === 1 ? 'wolf' : 'wolves'} removed by the experimenter.`);
+    if (count) this.log('info', `${count} ${speciesName(species, count)} removed by the experimenter.`);
   }
 
   // ------------------------------------------------------------------ bookkeeping
@@ -457,11 +565,14 @@ export class Ecosystem {
   }
 
   private checkExtinction() {
-    for (const s of ['deer', 'wolf'] as const) {
-      const alive = this.count(s) > 0;
+    const counts = perSpecies(() => 0);
+    for (const a of this.animals) if (a.alive) counts[a.species]++;
+    for (const s of SPECIES_IDS) {
+      const alive = counts[s] > 0;
       if (!alive && this.extinct[s] < 0 && this.everHad(s)) {
         this.extinct[s] = this.day;
-        this.log('extinct', `${s === 'deer' ? 'Deer' : 'Wolves'} went extinct on day ${this.day.toFixed(1)}.`);
+        const name = SPECIES[s].plural;
+        this.log('extinct', `${name[0].toUpperCase()}${name.slice(1)} went extinct on day ${this.day.toFixed(1)}.`);
       } else if (alive && this.extinct[s] >= 0) {
         this.extinct[s] = -1;
       }
@@ -469,7 +580,8 @@ export class Ecosystem {
   }
 
   private everHad(s: Species) {
-    return (s === 'deer' ? this.setup.initialDeer + this.counters.added.deer : this.setup.initialWolves + this.counters.added.wolf) > 0;
+    const initial = s === 'deer' ? this.setup.initialDeer : s === 'wolf' ? this.setup.initialWolves : this.setup.fauna?.[s as FaunaId] ?? 0;
+    return initial + this.counters.added[s] + this.counters.births[s] > 0;
   }
 
   count(s: Species) {

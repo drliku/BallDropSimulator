@@ -4,12 +4,12 @@ import { HALF, VEG_N, WORLD_SIZE } from './world';
 export type HeatKind = 'vegetation' | 'deer' | 'wolves' | 'resources' | 'predation';
 
 /**
- * Spatial summaries on a 32 × 32 grid, all derived from the simulated state:
+ * Spatial summaries on a 56 × 56 grid, all derived from the simulated state:
  * vegetation density, smoothed deer and wolf densities, resource availability
  * (food × water access) and decaying predation hotspots.
  */
 export class HeatMaps {
-  static N = 32;
+  static N = 56;
   readonly cell = WORLD_SIZE / HeatMaps.N;
   vegetation = new Float32Array(HeatMaps.N ** 2);
   deer = new Float32Array(HeatMaps.N ** 2);
@@ -46,7 +46,10 @@ export class HeatMaps {
     }
     const k = initial ? 1 : 0.25;
     const dc = new Float32Array(N * N), wc = new Float32Array(N * N);
-    for (const a of sim.animals) (a.species === 'deer' ? dc : wc)[this.idx(a.x, a.z)] += 1;
+    for (const a of sim.animals) {
+      if (a.species === 'deer') dc[this.idx(a.x, a.z)] += 1;
+      else if (a.species === 'wolf') wc[this.idx(a.x, a.z)] += 1;
+    }
     for (let i = 0; i < N * N; i++) {
       this.deer[i] += (dc[i] - this.deer[i]) * k;
       this.wolves[i] += (wc[i] - this.wolves[i]) * k;

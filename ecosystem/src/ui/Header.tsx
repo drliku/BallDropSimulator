@@ -26,7 +26,7 @@ export function Header() {
         <span className="h-8 w-px bg-white/15" aria-hidden="true" />
         <div className="min-w-0">
           <h1 className="font-display text-[22px] uppercase leading-tight tracking-[0.04em]">Forest Ecosystem Lab</h1>
-          <p className="hidden text-[12px] text-ink-muted md:block">Wolves, deer and vegetation, simulated animal by animal</p>
+          <p className="hidden text-[12px] text-ink-muted md:block">Fourteen species of a northern forest, simulated animal by animal</p>
         </div>
       </div>
 

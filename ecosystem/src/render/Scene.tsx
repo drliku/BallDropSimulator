@@ -7,7 +7,9 @@ import { useController } from '../runtime/context';
 import type { Controller } from '../runtime/controller';
 import { ControllerContext } from '../runtime/context';
 import { getWorld } from '../sim/world';
-import { AnimalHerd, Carcasses } from './Animals';
+import { AnimalHerd, Birds, Carcasses } from './Animals';
+import { FAUNA_IDS, SPECIES } from '../sim/species';
+import { HALF } from '../sim/world';
 import { Flora, Grass, HeatOverlay, Terrain, Water } from './World';
 import { HuntMarkers } from './Hunts';
 import { WeatherFX, weatherFx } from './Weather';
@@ -50,7 +52,7 @@ function Lighting() {
     const wm = ctl.sim.weather.mix;
     const flash = weatherFx.flash;
     if (sun.current) {
-      sun.current.position.set(Math.cos(ang) * 160, Math.max(8, Math.sin(ang) * 180), 60);
+      sun.current.position.set(Math.cos(ang) * 260, Math.max(14, Math.sin(ang) * 300), 100);
       sun.current.intensity = 2.4 * day * (1 - 0.78 * wm.cloud);
       sun.current.color.setRGB(1, 0.85 + 0.15 * (1 - golden), 0.7 + 0.3 * (1 - golden));
     }
@@ -81,22 +83,22 @@ function Lighting() {
         ref={sun}
         castShadow
         intensity={2.4}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-left={-120}
-        shadow-camera-right={120}
-        shadow-camera-top={120}
-        shadow-camera-bottom={-120}
-        shadow-camera-far={500}
+        shadow-mapSize-width={4096}
+        shadow-mapSize-height={4096}
+        shadow-camera-left={-HALF - 10}
+        shadow-camera-right={HALF + 10}
+        shadow-camera-top={HALF + 10}
+        shadow-camera-bottom={-HALF - 10}
+        shadow-camera-far={900}
         shadow-bias={-0.0006}
       />
       <directionalLight ref={moon} position={[-80, 120, -60]} color="#9fb6ff" intensity={0} />
-      <Stars ref={stars as never} radius={300} depth={60} count={2500} factor={5} fade speed={0.3} />
+      <Stars ref={stars as never} radius={600} depth={80} count={2500} factor={5} fade speed={0.3} />
     </>
   );
 }
 
-const DEFAULT_CAM = new THREE.Vector3(10, 62, 105);
+const DEFAULT_CAM = new THREE.Vector3(20, 115, 190);
 
 /** Orbit controls plus follow, top-down, cinematic and reset modes, with smooth transitions. */
 function CameraRig() {
@@ -111,13 +113,14 @@ function CameraRig() {
   useFrame((_, dt) => {
     const c = controls.current;
     if (!c) return;
+    (window as unknown as { ecosystemControls: OrbitImpl }).ecosystemControls = c;
     const cmd = ctl.cameraCommand;
     if (cmd.n !== lastCmd.current) {
       lastCmd.current = cmd.n;
       const tgt = c.target.clone();
       if (cmd.kind === 'reset') goal.current = { pos: DEFAULT_CAM.clone(), target: new THREE.Vector3(0, 0, 0), t: 0 };
-      if (cmd.kind === 'top') goal.current = { pos: new THREE.Vector3(tgt.x, 230, tgt.z + 0.1), target: new THREE.Vector3(tgt.x, 0, tgt.z), t: 0 };
-      if (cmd.kind === 'cinematic') goal.current = { pos: new THREE.Vector3(150, 70, 0), target: new THREE.Vector3(0, 0, 0), t: 0 };
+      if (cmd.kind === 'top') goal.current = { pos: new THREE.Vector3(tgt.x, 420, tgt.z + 0.1), target: new THREE.Vector3(tgt.x, 0, tgt.z), t: 0 };
+      if (cmd.kind === 'cinematic') goal.current = { pos: new THREE.Vector3(250, 110, 0), target: new THREE.Vector3(0, 0, 0), t: 0 };
       if (cmd.kind === 'follow') {
         const a = ctl.sim.byId.get(ctl.selectedId);
         if (a) {
@@ -161,7 +164,7 @@ function CameraRig() {
       dampingFactor={0.08}
       maxPolarAngle={Math.PI * 0.47}
       minDistance={6}
-      maxDistance={340}
+      maxDistance={620}
       screenSpacePanning={false}
     />
   );
@@ -187,8 +190,12 @@ function SelectionMarker() {
     ring.current.scale.setScalar(1 + 0.08 * Math.sin(clock.elapsedTime * 4));
     if (ctl.showRadius) {
       const p = ctl.sim.params;
-      const r = a.species === 'deer' ? p.detectionRadius * (0.5 + 0.5 * ctl.sim.daylight) : p.wolfSensing * (0.75 + 0.25 * ctl.sim.daylight);
-      lineMat.color.set(a.species === 'deer' ? '#7cc4ff' : '#ff7a6b');
+      const S = SPECIES[a.species];
+      const hunter = S.prey.length > 0;
+      const r = a.species === 'deer' ? p.detectionRadius * (0.5 + 0.5 * ctl.sim.daylight)
+        : a.species === 'wolf' ? p.wolfSensing * (0.75 + 0.25 * ctl.sim.daylight)
+        : hunter && S.hunt ? S.hunt.sensing : S.detection;
+      lineMat.color.set(hunter ? '#ff7a6b' : '#7cc4ff');
       const pos = lineGeo.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i <= SEGS; i++) {
         const ang = (i / SEGS) * Math.PI * 2;
@@ -215,7 +222,7 @@ export function Scene({ controller }: { controller: Controller }) {
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={{ position: DEFAULT_CAM.toArray(), fov: 45, near: 0.5, far: 1200 }}
+      camera={{ position: DEFAULT_CAM.toArray(), fov: 45, near: 0.5, far: 2000 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       onPointerMissed={() => controller.selectedId !== -1 && controller.cameraMode !== 'follow' && controller.deselect()}
     >
@@ -230,6 +237,7 @@ export function Scene({ controller }: { controller: Controller }) {
         <Flora />
         <AnimalHerd species="deer" />
         <AnimalHerd species="wolf" />
+        {FAUNA_IDS.map((id) => (id === 'eagle' || id === 'raven' ? <Birds key={id} species={id} /> : <AnimalHerd key={id} species={id} />))}
         <Carcasses />
         <WeatherFX />
         <HuntMarkers />

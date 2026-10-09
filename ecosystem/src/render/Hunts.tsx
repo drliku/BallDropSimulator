@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useController } from '../runtime/context';
 import { getWorld } from '../sim/world';
+import { speciesName } from '../sim/species';
 
 const world = getWorld();
 const SLOTS = 6;
@@ -49,7 +50,7 @@ export function HuntMarkers() {
       const a = sim.byId.get(id);
       if (!a) return null;
       const x = a.px + (a.x - a.px) * ctl.alpha, z = a.pz + (a.z - a.pz) * ctl.alpha;
-      return { x, z, y: world.heightAt(x, z) };
+      return { x, z, y: world.heightAt(x, z) + a.alt };
     };
 
     // Active hunts, most advanced first.
@@ -77,7 +78,7 @@ export function HuntMarkers() {
       const arrow = arrows.current[s];
       if (arrow) { arrow.position.y = 5 + Math.sin(t * (chase ? 9 : 4)) * 0.6; arrow.rotation.y = t * 2; }
       if (label) {
-        const txt = chase ? `CHASE! · ${h.gap.toFixed(0)} m` : `STALKED · ${h.wolfIds.length} ${h.wolfIds.length > 1 ? 'wolves' : 'wolf'}`;
+        const txt = chase ? `CHASE! · ${h.gap.toFixed(0)} m` : `STALKED · ${h.wolfIds.length} ${speciesName(h.predator, h.wolfIds.length)}`;
         if (label.textContent !== txt) label.textContent = txt;
         label.dataset.phase = h.phase;
       }

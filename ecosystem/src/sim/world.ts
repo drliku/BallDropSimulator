@@ -6,10 +6,10 @@
 import { ValueNoise } from './noise';
 import { Rng } from './rng';
 
-export const WORLD_SIZE = 200;
+export const WORLD_SIZE = 360;
 export const HALF = WORLD_SIZE / 2;
 /** Vegetation / habitat grid resolution (cells per side) and cell size in metres. */
-export const VEG_N = 64;
+export const VEG_N = 112;
 export const CELL = WORLD_SIZE / VEG_N;
 export const TICKS_PER_DAY = 120;
 export const YEAR_DAYS = 100;
@@ -17,7 +17,7 @@ export const YEAR_DAYS = 100;
 export const DAY_START = 7 / 24;
 
 const WORLD_SEED = 917_331;
-const HEIGHT_N = 257;
+const HEIGHT_N = 361;
 
 export type ObstacleKind = 'conifer' | 'broadleaf' | 'rock';
 export interface Obstacle { x: number; z: number; r: number; kind: ObstacleKind; scale: number; tint: number; rot: number }
@@ -30,11 +30,16 @@ export interface World {
   slopeAt(x: number, z: number): number;
   /** Per vegetation cell: canopy density 0–1. */
   forest: Float32Array;
-  /** Per vegetation cell: distance (m) to the stream centre line and to the pond centre. */
+  /**
+   * Per vegetation cell: distance (m) to the nearest stream centre line, and to the nearest pond
+   * measured as if every pond had the reference radius of 10 m (so one water-level rule fits all).
+   */
   streamDist: Float32Array;
   pondDist: Float32Array;
-  streamPath: Point[];
-  pond: { x: number; z: number; r: number };
+  /** The river (first) and its tributaries, as centre lines. */
+  streams: Point[][];
+  /** Lakes and ponds; `r` is the radius at full water. */
+  ponds: { x: number; z: number; r: number }[];
   obstacles: Obstacle[];
   bushes: Bush[];
   /** Static obstacle grid for neighbourhood queries. */
@@ -73,25 +78,45 @@ export function getWorld(): World {
   const noise = new ValueNoise(WORLD_SEED);
   const rng = new Rng(WORLD_SEED + 1);
 
-  // Stream: a meandering channel from the north edge to the south edge.
-  const streamPath: Point[] = [];
-  for (let z = -HALF - 4; z <= HALF + 4; z += 2) {
-    streamPath.push({ x: -18 + 26 * Math.sin(z * 0.024 + 0.7) + 8 * Math.sin(z * 0.061 + 2.1), z });
+  // River: meanders from the north edge to the south edge. A tributary joins it from the east.
+  const river: Point[] = [];
+  for (let z = -HALF - 4; z <= HALF + 4; z += 2.5) {
+    river.push({ x: -30 + 42 * Math.sin(z * 0.014 + 0.7) + 12 * Math.sin(z * 0.043 + 2.1), z });
   }
-  const pond = { x: 48, z: -34, r: 10 };
+  const join = river[Math.round(river.length * 0.58)];
+  const creek: Point[] = [];
+  for (let t = 0; t <= 1.0001; t += 0.02) {
+    const x = HALF + 4 + (join.x - HALF - 4) * t;
+    const z = -40 + (join.z + 40) * t + 16 * Math.sin(t * 7.5);
+    creek.push({ x, z });
+  }
+  const streams = [river, creek];
+  const ponds = [{ x: 96, z: -92, r: 17 }, { x: -118, z: 104, r: 10 }, { x: 52, z: 118, r: 8 }];
+  const streamDistAt = (x: number, z: number) => Math.min(distToPolyline(x, z, river), distToPolyline(x, z, creek) + 1.2);
+  const pondDistAt = (x: number, z: number) => {
+    let best = Infinity;
+    for (const p of ponds) best = Math.min(best, Math.hypot(x - p.x, z - p.z) - (p.r - 10));
+    return best;
+  };
 
-  // Fine heightmap: rolling hills, a carved valley along the stream and a pond basin.
+  // Fine heightmap: rolling hills, a rocky ridge along the west edge, carved valleys and basins.
   const heights = new Float32Array(HEIGHT_N * HEIGHT_N);
   const step = WORLD_SIZE / (HEIGHT_N - 1);
   for (let j = 0; j < HEIGHT_N; j++) {
     for (let i = 0; i < HEIGHT_N; i++) {
       const x = -HALF + i * step, z = -HALF + j * step;
-      let h = (noise.fbm(x / 62 + 3.1, z / 62 - 1.7, 5) - 0.5) * 16;
-      h += (noise.fbm(x / 22 - 7, z / 22 + 5, 3) - 0.5) * 2.2;
-      const ds = distToPolyline(x, z, streamPath);
-      h = h * (0.35 + 0.65 * Math.min(1, ds / 26)) - 2.6 * Math.exp(-((ds / 7) ** 2));
-      const dp = Math.hypot(x - pond.x, z - pond.z);
-      h = h * (0.4 + 0.6 * Math.min(1, dp / 24)) - 2.4 * Math.exp(-((dp / 12) ** 2));
+      let h = (noise.fbm(x / 70 + 3.1, z / 70 - 1.7, 5) - 0.5) * 20;
+      h += (noise.fbm(x / 22 - 7, z / 22 + 5, 3) - 0.5) * 2.4;
+      // Ridge: rises toward the west edge, strongest in the north-west.
+      const ridge = Math.max(0, (-x - 95) / 85);
+      h += ridge * ridge * (26 + 14 * noise.fbm(z / 40 + 9, x / 40, 3)) * (0.75 + 0.25 * Math.max(0, -z / HALF));
+      const ds = streamDistAt(x, z);
+      h = h * (0.3 + 0.7 * Math.min(1, ds / 34)) - 2.8 * Math.exp(-((ds / 8) ** 2));
+      for (const p of ponds) {
+        const dp = Math.hypot(x - p.x, z - p.z);
+        const k = p.r / 10;
+        h = h * (0.4 + 0.6 * Math.min(1, dp / (24 * k))) - 2.6 * Math.exp(-((dp / (12 * k)) ** 2));
+      }
       heights[j * HEIGHT_N + i] = h;
     }
   }
@@ -115,10 +140,12 @@ export function getWorld(): World {
   const pondDist = new Float32Array(n2);
   for (let c = 0; c < n2; c++) {
     const { x, z } = cellCenter(c);
-    streamDist[c] = distToPolyline(x, z, streamPath);
-    pondDist[c] = Math.hypot(x - pond.x, z - pond.z);
-    const n = noise.fbm(x / 44 + 11, z / 44 - 4, 4);
-    let f = Math.min(1, Math.max(0, (n - 0.5) / 0.1));
+    streamDist[c] = streamDistAt(x, z);
+    pondDist[c] = pondDistAt(x, z);
+    const n = noise.fbm(x / 50 + 11, z / 50 - 4, 4);
+    // Conifer forest thickens up the ridge; meadows elsewhere.
+    const ridge = Math.max(0, (-x - 110) / 70);
+    let f = Math.min(1, Math.max(0, (n - 0.5 + 0.25 * ridge) / 0.1));
     f *= Math.min(1, Math.max(0, (streamDist[c] - 5) / 8)) * Math.min(1, Math.max(0, (pondDist[c] - 13) / 8));
     forest[c] = f;
   }
@@ -136,19 +163,20 @@ export function getWorld(): World {
   };
   const place = (x: number, z: number) => { const k = key(x, z); (occ.get(k) ?? occ.set(k, []).get(k)!).push({ x, z }); };
 
-  for (let tries = 0; tries < 9000 && obstacles.length < 430; tries++) {
+  for (let tries = 0; tries < 40000 && obstacles.length < 1450; tries++) {
     const x = rng.range(-HALF + 3, HALF - 3), z = rng.range(-HALF + 3, HALF - 3);
     const c = cellIndex(x, z);
     const f = forest[c];
     const accept = f > 0.05 ? rng.chance(0.25 + 0.75 * f) : rng.chance(0.012) && streamDist[c] > 8 && pondDist[c] > 14;
     if (!accept || !free(x, z, f > 0.05 ? 3.4 : 6)) continue;
     place(x, z);
-    const conifer = noise.noise(x / 30 + 40, z / 30) > 0.45 ? rng.chance(0.75) : rng.chance(0.25);
+    const conifer = noise.noise(x / 30 + 40, z / 30) > 0.45 || x < -110 ? rng.chance(0.8) : rng.chance(0.25);
     const scale = rng.range(0.75, 1.35);
     obstacles.push({ x, z, r: (conifer ? 0.45 : 0.55) * scale, kind: conifer ? 'conifer' : 'broadleaf', scale, tint: rng.next(), rot: rng.range(0, Math.PI * 2) });
   }
-  // Rocks: scattered, more on slopes and hilltops.
-  for (let tries = 0; tries < 3000 && obstacles.filter((o) => o.kind === 'rock').length < 75; tries++) {
+  // Rocks: scattered, more on slopes, hilltops and the ridge.
+  let rocks = 0;
+  for (let tries = 0; tries < 12000 && rocks < 260; tries++) {
     const x = rng.range(-HALF + 4, HALF - 4), z = rng.range(-HALF + 4, HALF - 4);
     const c = cellIndex(x, z);
     if (streamDist[c] < 5 || pondDist[c] < 12) continue;
@@ -157,10 +185,11 @@ export function getWorld(): World {
     if (!free(x, z, 2 + scale * 1.4)) continue;
     place(x, z);
     obstacles.push({ x, z, r: 0.75 * scale, kind: 'rock', scale, tint: rng.next(), rot: rng.range(0, Math.PI * 2) });
+    rocks++;
   }
   // Bushes (no collision, provide cover visually) along forest edges and scattered.
   const bushes: Bush[] = [];
-  for (let tries = 0; tries < 6000 && bushes.length < 320; tries++) {
+  for (let tries = 0; tries < 24000 && bushes.length < 1000; tries++) {
     const x = rng.range(-HALF + 2, HALF - 2), z = rng.range(-HALF + 2, HALF - 2);
     const c = cellIndex(x, z);
     const edge = forest[c] > 0.05 && forest[c] < 0.7;
@@ -181,7 +210,7 @@ export function getWorld(): World {
       for (let gx = Math.max(0, minX); gx <= Math.min(obstacleN - 1, maxX); gx++) obstacleGrid[gz * obstacleN + gx].push(idx);
   });
 
-  cached = { heights, heightAt, slopeAt, forest, streamDist, pondDist, streamPath, pond, obstacles, bushes, obstacleGrid, obstacleCell, obstacleN };
+  cached = { heights, heightAt, slopeAt, forest, streamDist, pondDist, streams, ponds, obstacles, bushes, obstacleGrid, obstacleCell, obstacleN };
   return cached;
 }
 

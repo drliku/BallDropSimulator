@@ -14,27 +14,31 @@ import {
 } from './agents';
 import type { Ecosystem } from './ecosystem';
 import { CELL, HALF, cellCenter, cellIndex } from './world';
+import { PREDATOR_OF, SPECIES, SPECIES_IDS } from './species';
 
 const TAU = Math.PI * 2;
 const wrap = (a: number) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
 
 // ------------------------------------------------------------------ steering
 
-interface Steer { dx: number; dz: number; speed: number }
+export interface Steer { dx: number; dz: number; speed: number }
 
 /**
  * Turn toward the desired direction (with a turn-rate limit), adjust speed with limited
  * acceleration, avoid obstacles and edges, keep spacing, then move and resolve collisions.
  */
-function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true) {
+export function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true) {
   let { dx, dz } = s;
   const w = sim.world;
+  const flies = !!SPECIES[a.species].flies && a.alt > 1.5;
+  // Standing or barely moving (resting, grazing, drinking): no need to steer around anything.
+  const still = s.speed < 0.05 && a.speed < 0.05;
 
   // Obstacle look-ahead avoidance
   const ahead = 2.6 + a.speed * 4;
   const hx = Math.cos(a.heading), hz = Math.sin(a.heading);
   const gx = Math.floor((a.x + HALF) / w.obstacleCell), gz = Math.floor((a.z + HALF) / w.obstacleCell);
-  for (let oz = gz - 1; oz <= gz + 1; oz++) for (let ox = gx - 1; ox <= gx + 1; ox++) {
+  if (!flies && !still) for (let oz = gz - 1; oz <= gz + 1; oz++) for (let ox = gx - 1; ox <= gx + 1; ox++) {
     if (ox < 0 || oz < 0 || ox >= w.obstacleN || oz >= w.obstacleN) continue;
     for (const idx of w.obstacleGrid[oz * w.obstacleN + ox]) {
       const o = w.obstacles[idx];
@@ -71,8 +75,10 @@ function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true)
   // Speed: terrain and water slow animals down; sharp turns cost speed.
   const c = cellIndex(a.x, a.z);
   let target = s.speed;
-  if (sim.veg.water[c]) target *= 0.65;
-  if (target > T.trot) target *= 1 - 0.18 * w.forest[c];
+  if (!flies) {
+    if (sim.veg.water[c] && a.species !== 'beaver' && a.species !== 'moose') target *= 0.65;
+    if (target > T.trot) target *= 1 - 0.18 * w.forest[c];
+  }
   const misalign = Math.abs(wrap(Math.atan2(dz, dx) - a.heading));
   if (misalign > 1.2) target *= 0.55;
   a.speed += Math.max(-T.accel * 1.6, Math.min(T.accel, target - a.speed));
@@ -82,10 +88,9 @@ function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true)
   let nz = a.z + Math.sin(a.heading) * a.speed;
 
   // Separation from same-species neighbours (avoid overlapping bodies)
-  if (separation) {
-    const hash = a.species === 'deer' ? sim.deerHash : sim.wolfHash;
+  if (separation && !flies && !still) {
     const minD = T.radius * 2.1;
-    hash.query(nx, nz, minD, (i) => {
+    sim.hashes[a.species].query(nx, nz, minD, (i) => {
       const b = sim.animals[i];
       if (b === a || !b.alive) return;
       const ddx = nx - b.x, ddz = nz - b.z;
@@ -96,7 +101,7 @@ function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true)
 
   // Resolve obstacle collisions (push out of trunks and rocks)
   const cgx = Math.floor((nx + HALF) / w.obstacleCell), cgz = Math.floor((nz + HALF) / w.obstacleCell);
-  if (cgx >= 0 && cgz >= 0 && cgx < w.obstacleN && cgz < w.obstacleN) {
+  if (!flies && (!still || a.speed > 0) && cgx >= 0 && cgz >= 0 && cgx < w.obstacleN && cgz < w.obstacleN) {
     for (const idx of w.obstacleGrid[cgz * w.obstacleN + cgx]) {
       const o = w.obstacles[idx];
       const ddx = nx - o.x, ddz = nz - o.z;
@@ -114,25 +119,27 @@ function move(sim: Ecosystem, a: Animal, T: Traits, s: Steer, separation = true)
 
   // Energy: basal metabolism plus movement cost ∝ (v / sprint)²; stamina drains when sprinting.
   const p = sim.params;
-  const resting = a.state === 'rest' || a.state === 'recover';
+  const resting = a.state === 'rest' || a.state === 'recover' || a.state === 'hibernate';
   const juvenile = !isAdult(a);
   const v = a.speed / T.sprint;
-  const cost = p.energyCost * (T.basal * (resting ? 0.6 : 1) * (a.pregnantDays >= 0 ? 1.25 : 1) * (juvenile ? 0.75 : 1) + T.moveCost * v * v);
+  // Hibernating bears run on a fraction of their normal metabolism.
+  const torpor = a.state === 'hibernate' ? 0.2 : 1;
+  const cost = p.energyCost * (T.basal * torpor * (resting ? 0.6 : 1) * (a.pregnantDays >= 0 ? 1.25 : 1) * (juvenile ? 0.75 : 1) + T.moveCost * v * v);
   a.energy = Math.max(0, a.energy - cost);
   const flows = sim.currentFlows;
-  if (a.species === 'deer') flows.deerSpent += cost; else flows.wolfSpent += cost;
+  if (a.species === 'deer') flows.deerSpent += cost; else if (a.species === 'wolf') flows.wolfSpent += cost;
   if (a.speed > T.trot * 1.05) a.stamina = Math.max(0, a.stamina - T.sprintDrain * v);
   else a.stamina = Math.min(100, a.stamina + T.staminaRegen * (resting ? 2 : a.speed < 0.05 ? 1.4 : 1));
 }
 
-const toward = (a: Animal, x: number, z: number) => ({ dx: x - a.x, dz: z - a.z, d: Math.hypot(x - a.x, z - a.z) });
+export const toward = (a: Animal, x: number, z: number) => ({ dx: x - a.x, dz: z - a.z, d: Math.hypot(x - a.x, z - a.z) });
 
-function setState(a: Animal, s: Animal['state']) {
+export function setState(a: Animal, s: Animal['state']) {
   if (a.state !== s) { a.state = s; a.stateTicks = 0; }
 }
 
 /** How visible things are: daylight and canopy. */
-function visibility(sim: Ecosystem, x: number, z: number) {
+export function visibility(sim: Ecosystem, x: number, z: number) {
   return (0.5 + 0.5 * sim.daylight) * (1 - 0.4 * sim.world.forest[cellIndex(x, z)]) * sim.weather.visibility;
 }
 
@@ -169,6 +176,22 @@ export function updateDeer(sim: Ecosystem, d: Animal) {
         const wgt = 1 / (dist * dist);
         fx += (d.x - w.x) / dist * wgt * 100;
         fz += (d.z - w.z) / dist * wgt * 100;
+        threats++;
+      }
+    });
+    // Other hunters: cougars (all deer), bears and lynx (fawns only, but adults keep clear too).
+    for (const pred of DEER_HUNTERS) sim.hashes[pred].query(d.x, d.z, R * 1.2, (i) => {
+      const o = sim.animals[i];
+      const rel = PREDATOR_OF.deer[o.species];
+      if (!rel || !o.alive) return;
+      const dist = Math.hypot(o.x - d.x, o.z - d.z);
+      // Cats are hard to spot while they creep in.
+      const hunting = o.state === 'chase' ? 1.3 : o.state === 'stalk' ? 0.3 : 0.35;
+      const notice = R * hunting * (rel === 1 && isAdult(d) ? 0.5 : 1);
+      if (dist < notice && dist > 1e-6) {
+        const wgt = 1 / (dist * dist);
+        fx += (d.x - o.x) / dist * wgt * 100;
+        fz += (d.z - o.z) / dist * wgt * 100;
         threats++;
       }
     });
@@ -350,7 +373,7 @@ function decideDeer(sim: Ecosystem, d: Animal, c: number) {
   }
 }
 
-function wanderTarget(sim: Ecosystem, a: Animal, r: number) {
+export function wanderTarget(sim: Ecosystem, a: Animal, r: number) {
   const ang = a.heading + sim.rng.range(-1.3, 1.3);
   const dist = sim.rng.range(r * 0.4, r);
   a.tx = Math.max(-HALF + 6, Math.min(HALF - 6, a.x + Math.cos(ang) * dist));
@@ -363,7 +386,7 @@ function wanderTarget(sim: Ecosystem, a: Animal, r: number) {
 function nearestCarcass(sim: Ecosystem, w: Animal, r: number): Carcass | null {
   let best: Carcass | null = null, bd = r;
   for (const c of sim.carcasses) {
-    if (c.meat < 2) continue;
+    if (c.meat < 2 || c.species === 'wolf') continue;
     const d = Math.hypot(c.x - w.x, c.z - w.z);
     if (d < bd) { bd = d; best = c; }
   }
@@ -499,6 +522,20 @@ function decideWolf(sim: Ecosystem, w: Animal, leader: Animal | undefined) {
       const score = weak / (dist + 5);
       if (score > bestScore) { bestScore = score; best = d; }
     });
+    // Other prey: elk, moose (mostly calves and the weak), boar and beavers.
+    for (const preyId of WOLF_PREY_IDS) sim.hashes[preyId].query(w.x, w.z, range, (i) => {
+      const d = sim.animals[i];
+      const link = WOLF_PREY[d.species];
+      if (!link || !d.alive || d.alt > 1.5) return;
+      const dist = Math.hypot(d.x - w.x, d.z - w.z);
+      if (dist > range) return;
+      const S = SPECIES[d.species];
+      const weak = 1 + (1 - d.energy / 100) * 1.2 + (isAdult(d) ? 0 : 0.8) + (d.age > d.lifespan * 0.8 ? 0.5 : 0);
+      // Big, dangerous prey is taken mainly when it is young or weak.
+      const risk = isAdult(d) ? S.toughness : 1;
+      const score = (weak * link * risk) / (dist + 5);
+      if (score > bestScore) { bestScore = score; best = d; }
+    });
     if (best) {
       const d = best as Animal;
       w.targetId = d.id;
@@ -540,7 +577,10 @@ function patrolTarget(sim: Ecosystem, w: Animal, r: number) {
   w.tx = pt.x; w.tz = pt.z;
 }
 
-const STALK_MIN_TICKS = 20;
+export const STALK_MIN_TICKS = 20;
+const WOLF_PREY: Partial<Record<Animal['species'], number>> = Object.fromEntries(SPECIES.wolf.prey.filter((p) => p.id !== 'deer').map((p) => [p.id, p.weight]));
+const WOLF_PREY_IDS = SPECIES.wolf.prey.filter((p) => p.id !== 'deer').map((p) => p.id);
+const DEER_HUNTERS = SPECIES_IDS.filter((id) => id !== 'wolf' && PREDATOR_OF.deer[id]);
 
 /** Pursuit with lead, stamina limits, give-up rules and the capture attempt. */
 function chase(sim: Ecosystem, w: Animal, speedMul: number) {
@@ -580,7 +620,7 @@ function chase(sim: Ecosystem, w: Animal, speedMul: number) {
     const packBonus = 1 + 0.35 * Math.min(3, support);
     const cover = 1 - 0.35 * sim.world.forest[cellIndex(d.x, d.z)];
     const light = sim.daylight < 0.15 ? 1 : sim.daylight < 0.85 ? 1.12 : 0.9; // dusk and dawn favour wolves
-    const prob = Math.max(0.02, Math.min(0.95, p.huntSuccess * condition * packBonus * cover * light * sim.weather.capture));
+    const prob = Math.max(0.02, Math.min(0.95, p.huntSuccess * condition * packBonus * cover * light * sim.weather.capture * (isAdult(d) ? SPECIES[d.species].toughness : 1)));
     if (sim.rng.chance(prob)) {
       // A chase counts once when it ends, in a kill or a give-up.
       sim.counters.hunts.attempts++;

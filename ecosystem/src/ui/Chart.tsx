@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUi } from '../runtime/context';
+import { FAUNA_IDS, SPECIES, type FaunaId } from '../sim/species';
 
 type Key = 'wolves' | 'deer' | 'vegPct';
 const SERIES: { key: Key; label: string; color: string; axis: 'left' | 'right' }[] = [
@@ -21,17 +22,19 @@ export function Chart() {
   const ctl = useUi();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [show, setShow] = useState<Record<Key, boolean>>({ wolves: true, deer: true, vegPct: true });
+  const [extra, setExtra] = useState<FaunaId[]>([]);
   const [range, setRange] = useState(0);
   const [hover, setHover] = useState<number | null>(null); // x in CSS px
   const [tip, setTip] = useState<{ x: number; day: number; vals: { label: string; color: string; v: string }[] } | null>(null);
 
   // When the graph is paused it shows a frozen copy (the simulation keeps running).
-  const snap = useRef<{ day: number[]; deer: number[]; wolves: number[]; vegPct: number[]; frozen: boolean } | null>(null);
+  const snap = useRef<{ day: number[]; deer: number[]; wolves: number[]; vegPct: number[]; species: Record<FaunaId, number[]>; frozen: boolean } | null>(null);
   if (!ctl.chartPaused || !snap.current?.frozen) {
-    const d = ctl.sim.history.data;
+    const h = ctl.sim.history, d = h.data;
+    const sp = h.species as Record<FaunaId, number[]>;
     snap.current = ctl.chartPaused
-      ? { day: d.day.slice(), deer: d.deer.slice(), wolves: d.wolves.slice(), vegPct: d.vegPct.slice(), frozen: true }
-      : { day: d.day, deer: d.deer, wolves: d.wolves, vegPct: d.vegPct, frozen: false };
+      ? { day: d.day.slice(), deer: d.deer.slice(), wolves: d.wolves.slice(), vegPct: d.vegPct.slice(), species: Object.fromEntries(FAUNA_IDS.map((k) => [k, sp[k].slice()])) as Record<FaunaId, number[]>, frozen: true }
+      : { day: d.day, deer: d.deer, wolves: d.wolves, vegPct: d.vegPct, species: sp, frozen: false };
   }
   const version = ctl.chartPaused ? -1 : ctl.uiVersion;
 
@@ -61,6 +64,7 @@ export function Chart() {
       for (let i = i0; i < n; i++) maxL = Math.max(maxL, data[k][i]);
       for (const r of ctl.savedRuns) for (let i = 0; i < r.data.day.length; i++) if (r.data.day[i] >= d0 && r.data.day[i] <= d1) maxL = Math.max(maxL, r.data[k][i]);
     }
+    for (const id of extra) for (let i = i0; i < n; i++) maxL = Math.max(maxL, data.species[id][i] ?? 0);
     maxL = niceMax(maxL * 1.05);
     const X = (d: number) => pad.l + ((d - d0) / (d1 - d0)) * pw;
     const YL = (v: number) => pad.t + ph - (v / maxL) * ph;
@@ -102,6 +106,7 @@ export function Chart() {
       g.stroke();
     };
     for (const r of ctl.savedRuns) for (const s of SERIES) if (show[s.key]) line(r.data.day, r.data[s.key], 0, r.color, s.axis === 'right', true, 1.2);
+    for (const id of extra) line(data.day, data.species[id], i0, SPECIES[id].color, false, false, 1.5);
     for (const s of SERIES) if (show[s.key]) line(data.day, data[s.key], i0, s.color, s.axis === 'right', false, 2);
     g.setLineDash([]);
 
@@ -118,12 +123,15 @@ export function Chart() {
         g.fillStyle = s.color; g.beginPath(); g.arc(x, s.axis === 'right' ? YR(v) : YL(v), 3.5, 0, Math.PI * 2); g.fill();
       }
       g.restore();
-      setTip({ x, day: data.day[bi], vals: SERIES.filter((s) => show[s.key]).map((s) => ({ label: s.label, color: s.color, v: s.key === 'vegPct' ? `${data[s.key][bi].toFixed(0)}%` : String(data[s.key][bi]) })) });
+      setTip({ x, day: data.day[bi], vals: [
+        ...SERIES.filter((s) => show[s.key]).map((s) => ({ label: s.label, color: s.color, v: s.key === 'vegPct' ? `${data[s.key][bi].toFixed(0)}%` : String(data[s.key][bi]) })),
+        ...extra.map((id) => ({ label: SPECIES[id].plural[0].toUpperCase() + SPECIES[id].plural.slice(1), color: SPECIES[id].color, v: String(data.species[id][bi] ?? 0) })),
+      ] });
       return;
     }
     g.restore();
     setTip(null);
-  }, [version, show, range, hover, ctl.savedRuns, ctl.savedRuns.length]);
+  }, [version, show, extra, range, hover, ctl.savedRuns, ctl.savedRuns.length]);
 
   return (
     <section className="panel flex min-h-0 min-w-0 flex-col" aria-label="Population graph">
@@ -139,6 +147,17 @@ export function Chart() {
         <span className="mx-1 h-4 w-px bg-white/10" />
         <button type="button" className="chip" aria-pressed={ctl.chartPaused} onClick={() => ctl.setChartPaused(!ctl.chartPaused)}>{ctl.chartPaused ? 'Resume graph' : 'Pause graph'}</button>
         <button type="button" className="chip" onClick={() => ctl.resetHistory()}>Clear history</button>
+      </div>
+      <div className="scroll-thin flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-white/[0.06] px-3 py-1 [&>*]:shrink-0" aria-label="Show other species on the graph">
+        <span className="mr-1 text-[11px] text-ink-faint">Also plot:</span>
+        {FAUNA_IDS.map((id) => {
+          const on = extra.includes(id);
+          return (
+            <button key={id} type="button" className="chip flex h-6 items-center gap-1 px-1.5 text-[11px]" aria-pressed={on} onClick={() => setExtra(on ? extra.filter((e) => e !== id) : [...extra, id])}>
+              <i className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: SPECIES[id].color, opacity: on ? 1 : 0.4 }} />{SPECIES[id].plural}
+            </button>
+          );
+        })}
       </div>
       <div className="relative min-h-0 flex-1">
         <canvas

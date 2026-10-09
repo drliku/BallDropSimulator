@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useUi } from '../runtime/context';
 import type { Controller } from '../runtime/controller';
-import { DEER, WOLF, isAdult, traitsOf, type Animal } from '../sim/agents';
+import { isAdult, traitsOf, type Animal } from '../sim/agents';
+import { FAUNA_IDS, SPECIES, SPECIES_IDS, predatorsOf, speciesName, type SpeciesId } from '../sim/species';
 import { YEAR_DAYS } from '../sim/world';
 import { seasonName } from '../sim/vegetation';
 import { TICKS_PER_SECOND } from '../runtime/controller';
@@ -47,6 +48,7 @@ function Stats() {
         <Stat label="Successful hunts" value={c.hunts.kills} sub={`${c.hunts.attempts} chases · ${c.hunts.attempts ? Math.round((100 * c.hunts.kills) / c.hunts.attempts) : 0}% success`} />
         <Stat label="Avg energy" value={`${sim.averageEnergy('deer').toFixed(0)} / ${sim.averageEnergy('wolf').toFixed(0)}`} sub="deer / wolves (of 100)" />
       </div>
+      <Wildlife />
       <div className="rounded-lg border border-white/[0.07] p-3 text-[12px]">
         <div className="mb-1 font-medium text-ink">Deer deaths by cause</div>
         <div className="grid grid-cols-2 gap-x-3 font-mono text-ink-muted">
@@ -73,7 +75,32 @@ function Stats() {
   );
 }
 
+/** Every other species at a glance: count, 5-day trend, births and deaths. */
+function Wildlife() {
+  const ctl = useUi();
+  const sim = ctl.sim;
+  const counts = Object.fromEntries(SPECIES_IDS.map((id) => [id, 0])) as Record<SpeciesId, number>;
+  for (const a of sim.animals) if (a.alive) counts[a.species]++;
+  return (
+    <div className="rounded-lg border border-white/[0.07] p-3">
+      <div className="mb-1.5 flex items-baseline justify-between text-[12px]"><span className="font-medium text-ink">Wildlife</span><span className="text-ink-faint">born / died</span></div>
+      <div className="grid grid-cols-1 gap-y-0.5">
+        {FAUNA_IDS.map((id) => (
+          <div key={id} className="grid grid-cols-[12px_1fr_auto_14px_64px] items-center gap-2 text-[12px]" title={SPECIES[id].blurb}>
+            <i className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: SPECIES[id].color }} />
+            <span className="truncate text-ink-muted">{SPECIES[id].name}</span>
+            <span className="text-right font-mono text-ink">{counts[id]}</span>
+            <Trend now={counts[id]} before={sim.history.speciesAgo(id, 5)} />
+            <span className="text-right font-mono text-[11px] text-ink-faint">{sim.counters.births[id]} / {sim.totalDeaths(id)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const STATE_TEXT: Record<string, string> = {
+  hibernate: 'Hibernating through winter', follow: 'Following its mother',
   wander: 'Wandering', seekFood: 'Looking for food', graze: 'Grazing', seekWater: 'Heading to water', drink: 'Drinking', rest: 'Resting',
   alert: 'Alert, watching for danger', flee: 'Fleeing a predator', herd: 'Rejoining the herd', mate: 'Seeking a mate',
   patrol: 'Patrolling the territory', search: 'Following prey scent', stalk: 'Stalking prey', chase: 'Chasing prey', eat: 'Feeding at a carcass',
@@ -94,9 +121,10 @@ function reproStatus(a: Animal) {
 }
 
 function health(a: Animal) {
-  if (a.species === 'deer' && a.hydration <= 0) return 'Dehydrated (critical)';
+  const drinks = SPECIES[a.species].thirst > 0;
+  if (drinks && a.hydration <= 0) return 'Dehydrated (critical)';
   if (a.energy < 15) return 'Starving';
-  if (a.species === 'deer' && a.hydration < 25) return 'Very thirsty';
+  if (drinks && a.hydration < 25) return 'Very thirsty';
   if (a.energy < 40) return 'Hungry';
   if (a.stamina < 20) return 'Exhausted';
   if (a.age > a.lifespan * 0.85) return 'Elderly';
@@ -106,23 +134,29 @@ function health(a: Animal) {
 function Inspector() {
   const ctl = useUi();
   const a = ctl.sim.byId.get(ctl.selectedId);
-  if (!a) return <p className="text-[13px] leading-relaxed text-ink-muted">Click any deer or wolf in the forest to inspect it. Its card shows its needs, behaviour and life history, and you can follow it with the camera.</p>;
-  const T = a.species === 'deer' ? DEER : WOLF;
+  if (!a) return <p className="text-[13px] leading-relaxed text-ink-muted">Click any animal in the forest to inspect it. Its card shows its needs, behaviour, diet and life history, and you can follow it with the camera.</p>;
+  const S = SPECIES[a.species];
+  const T = traitsOf(a.species);
   const pack = a.species === 'wolf' ? ctl.sim.packs.get(a.packId) : undefined;
+  const hunter = S.prey.length > 0;
+  const eats = [...(S.plants ? ['plants'] : []), ...S.prey.map((p) => `${speciesName(p.id, 2)}${p.juvenileOnly ? ' (young)' : ''}`), ...(S.meat?.scavenges ? ['carrion'] : [])];
+  const huntedBy = predatorsOf(a.species).map((p) => `${speciesName(p.id, 2)}${p.juvenileOnly ? ' (young only)' : ''}`);
+  const stateText = a.state === 'follow' && a.species === 'raven' && isAdult(a) ? 'Shadowing the wolves' : STATE_TEXT[a.state] ?? a.state;
   const row = (k: string, v: ReactNode) => <div className="flex justify-between gap-3 border-t border-white/[0.06] py-1.5 text-[12.5px]"><span className="text-ink-muted">{k}</span><span className="text-right font-mono text-ink">{v}</span></div>;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-display text-[20px] uppercase tracking-[0.04em]" style={{ color: a.species === 'deer' ? '#7fb3ef' : '#ff8b84' }}>{a.species === 'deer' ? 'Deer' : 'Wolf'} #{a.id}</div>
+          <div className="font-display text-[20px] uppercase tracking-[0.04em]" style={{ color: S.color }}>{S.name} #{a.id}</div>
           <div className="text-[12px] text-ink-muted">{a.sex === 'F' ? 'Female' : 'Male'} · generation {a.generation}{pack ? ` · pack ${pack.id}${pack.leaderId === a.id ? ' (leader)' : ''}${pack.breederId === a.id ? ' (breeder)' : ''}` : ''}</div>
         </div>
-        <span className="rounded-md border border-forest/40 bg-forest/10 px-2 py-1 text-[12px] text-forest-soft">{STATE_TEXT[a.state] ?? a.state}</span>
+        <span className="rounded-md border border-forest/40 bg-forest/10 px-2 py-1 text-right text-[12px] text-forest-soft">{stateText}</span>
       </div>
+      <p className="m-0 text-[12px] leading-snug text-ink-muted">{S.blurb}</p>
       <div className="flex flex-col gap-1.5 text-[12px]">
         <div className="flex justify-between"><span className="text-ink-muted">Energy</span><span className="font-mono">{a.energy.toFixed(0)} / 100</span></div>{bar(a.energy, '#58b368')}
         <div className="flex justify-between"><span className="text-ink-muted">Hunger</span><span className="font-mono">{(100 - a.energy).toFixed(0)}%</span></div>{bar(100 - a.energy, '#e0a14b')}
-        {a.species === 'deer' && (<><div className="flex justify-between"><span className="text-ink-muted">Hydration</span><span className="font-mono">{a.hydration.toFixed(0)}%</span></div>{bar(a.hydration, '#4c8eda')}</>)}
+        {S.thirst > 0 && (<><div className="flex justify-between"><span className="text-ink-muted">Hydration</span><span className="font-mono">{a.hydration.toFixed(0)}%</span></div>{bar(a.hydration, '#4c8eda')}</>)}
         <div className="flex justify-between"><span className="text-ink-muted">Stamina</span><span className="font-mono">{a.stamina.toFixed(0)}%</span></div>{bar(a.stamina, '#c9c27a')}
       </div>
       <div>
@@ -130,15 +164,80 @@ function Inspector() {
         {row('Speed', `${(a.speed * TICKS_PER_SECOND).toFixed(1)} m/s (top ${(T.sprint * TICKS_PER_SECOND).toFixed(1)})`)}
         {row('Reproduction', reproStatus(a))}
         {row('Condition', health(a))}
-        {row(a.species === 'wolf' ? 'Kills' : 'Offspring', a.species === 'wolf' ? a.kills : a.offspring)}
-        {a.species === 'wolf' && row('Offspring', a.offspring)}
+        {S.flies && row('Altitude', `${a.alt.toFixed(0)} m`)}
+        {row('Eats', eats.join(', ') || '—')}
+        {row('Hunted by', huntedBy.join(', ') || 'nothing here')}
+        {hunter && row('Kills', a.kills)}
+        {row('Offspring', a.offspring)}
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={`btn ${ctl.cameraMode === 'follow' ? 'btn-primary' : ''}`} onClick={() => (ctl.cameraMode === 'follow' ? ctl.setCamera('free') : ctl.follow())}>{ctl.cameraMode === 'follow' ? 'Stop following' : 'Follow animal'}</button>
-        <button type="button" className="btn" aria-pressed={ctl.showRadius} onClick={() => ctl.setShowRadius(!ctl.showRadius)}>{ctl.showRadius ? 'Hide' : 'Show'} {a.species === 'deer' ? 'detection' : 'sensing'} radius</button>
+        <button type="button" className="btn" aria-pressed={ctl.showRadius} onClick={() => ctl.setShowRadius(!ctl.showRadius)}>{ctl.showRadius ? 'Hide' : 'Show'} {hunter ? 'hunting' : 'detection'} radius</button>
         <button type="button" className="btn" onClick={() => ctl.deselect()}>Deselect</button>
       </div>
     </div>
+  );
+}
+
+const WEB_ROWS: SpeciesId[][] = [
+  ['wolf', 'cougar', 'bear'],
+  ['lynx', 'fox', 'eagle', 'raven'],
+  ['deer', 'elk', 'moose', 'boar', 'hare', 'squirrel', 'beaver'],
+];
+
+/** Who eats whom: all fourteen species, sized by population; links thicken with recorded kills. */
+function WebDiagram() {
+  const ctl = useUi();
+  const sim = ctl.sim;
+  const W = 320, rowsY = [40, 125, 215], baseY = 300;
+  const pos = {} as Record<SpeciesId, { x: number; y: number }>;
+  WEB_ROWS.forEach((row, r) => row.forEach((id, i) => { pos[id] = { x: (W / (row.length + 1)) * (i + 1), y: rowsY[r] }; }));
+  const plants = { x: 110, y: baseY }, carrion = { x: 230, y: baseY };
+  const counts = Object.fromEntries(SPECIES_IDS.map((id) => [id, 0])) as Record<SpeciesId, number>;
+  for (const a of sim.animals) if (a.alive) counts[a.species]++;
+  const rad = (id: SpeciesId) => 9 + Math.min(9, Math.sqrt(counts[id]) * 0.9);
+  const links: { from: { x: number; y: number }; to: SpeciesId; kills: number; color: string; dashed: boolean; key: string; title: string }[] = [];
+  for (const pred of SPECIES_IDS) {
+    const S = SPECIES[pred];
+    for (const p of S.prey) {
+      const k = sim.counters.predation[pred][p.id] ?? 0;
+      links.push({ from: pos[p.id], to: pred, kills: k, color: SPECIES[pred].color, dashed: k === 0, key: `${p.id}-${pred}`, title: `${SPECIES[pred].name} ← ${SPECIES[p.id].name}: ${k} kills so far` });
+    }
+    if (S.plants) links.push({ from: plants, to: pred, kills: -1, color: '#58b368', dashed: false, key: `plants-${pred}`, title: `${SPECIES[pred].name} eats plants` });
+    if (S.meat?.scavenges) links.push({ from: carrion, to: pred, kills: -1, color: '#8a5a4a', dashed: true, key: `carrion-${pred}`, title: `${SPECIES[pred].name} scavenges carcasses` });
+  }
+  const width = (k: number) => (k < 0 ? 0.8 : k === 0 ? 0.8 : Math.min(6, 1 + Math.log2(1 + k)));
+  return (
+    <svg viewBox={`0 0 ${W} 330`} className="w-full" role="img" aria-label="Who eats whom: food web of all species">
+      {links.map((l) => {
+        const to = pos[l.to];
+        const r = rad(l.to);
+        const dx = to.x - l.from.x, dy = to.y - l.from.y, L = Math.hypot(dx, dy) || 1;
+        return (
+          <line key={l.key} x1={l.from.x} y1={l.from.y} x2={to.x - (dx / L) * r} y2={to.y - (dy / L) * r}
+            stroke={l.color} strokeWidth={width(l.kills)} strokeDasharray={l.dashed ? '3 3' : undefined} opacity={l.kills < 0 ? 0.35 : 0.75}>
+            <title>{l.title}</title>
+          </line>
+        );
+      })}
+      {[{ p: plants, label: 'PLANTS', color: '#58b368' }, { p: carrion, label: 'CARRION', color: '#a8705e' }].map((b) => (
+        <g key={b.label}>
+          <rect x={b.p.x - 38} y={b.p.y - 12} width={76} height={24} rx={6} fill="#1a1f1c" stroke={b.color} />
+          <text x={b.p.x} y={b.p.y + 4} textAnchor="middle" fill={b.color} fontSize={11} fontFamily="Brain, 'Saira Semi Condensed', sans-serif" letterSpacing={1}>{b.label}</text>
+        </g>
+      ))}
+      {SPECIES_IDS.map((id) => {
+        const p = pos[id], r = rad(id), S = SPECIES[id];
+        return (
+          <g key={id} opacity={counts[id] ? 1 : 0.4}>
+            <title>{`${S.name}: ${counts[id]} alive. ${S.blurb}`}</title>
+            <circle cx={p.x} cy={p.y} r={r} fill="#141816" stroke={S.color} strokeWidth={2} />
+            <text x={p.x} y={p.y + 3.5} textAnchor="middle" fill="#e9ede8" fontSize={9.5} fontFamily="'JetBrains Mono', monospace">{counts[id]}</text>
+            <text x={p.x} y={p.y + r + 10} textAnchor="middle" fill="#c9d1cb" fontSize={8.5} fontFamily="'Saira', sans-serif">{speciesName(id, 2)}</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -166,6 +265,10 @@ function FoodWeb() {
   );
   return (
     <div className="flex flex-col gap-3">
+      <h3 className="h-title text-[14px]">Who eats whom</h3>
+      <WebDiagram />
+      <p className="m-0 text-[12px] leading-snug text-ink-muted">Circles grow with population; solid links have recorded kills (thicker = more), dashed ones are diet links not yet seen in this run. Hover for details.</p>
+      <h3 className="h-title mt-1 text-[14px]">Energy: plants → deer → wolves</h3>
       <svg viewBox="0 0 320 400" className="w-full" role="img" aria-label="Food web with measured energy flows">
         <defs><marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#a3b0a6" /></marker></defs>
         {arrow(160, 62, 160, 108, 6, '#f2c14e')}

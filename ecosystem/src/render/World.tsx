@@ -11,7 +11,7 @@ import { HeatMaps, type HeatKind } from '../sim/heatmaps';
 import { waterGeometry } from '../sim/vegetation';
 import { CELL, HALF, VEG_N, WORLD_SIZE, cellIndex, getWorld } from '../sim/world';
 
-const SEG = 150;
+const SEG = 230;
 const world = getWorld();
 const C = (hex: string) => new THREE.Color(hex);
 const LUSH = C('#5d8f37'), DRY = C('#a39060'), BARE = C('#7d6a4c'), FOREST = C('#3d5a2a'), MUD = C('#6e6248'), ROCKY = C('#7d7a6e');
@@ -91,7 +91,7 @@ export function HeatOverlay() {
     return t;
   }, [N]);
   const geo = useMemo(() => {
-    const g = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 100, 100);
+    const g = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 160, 160);
     g.rotateX(-Math.PI / 2);
     const pos = g.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) pos.setY(i, world.heightAt(pos.getX(i), pos.getZ(i)) + 0.25);
@@ -139,7 +139,7 @@ export function HeatOverlay() {
 
 // ------------------------------------------------------------------ grass
 
-const GRASS_N = 7000;
+const GRASS_N = 18000;
 
 export function Grass() {
   const ctl = useController();
@@ -300,51 +300,63 @@ export function Flora() {
 
 export function Water() {
   const ctl = useController();
-  const stream = useRef<THREE.Mesh>(null);
-  const pond = useRef<THREE.Mesh>(null);
+  const streams = useRef<(THREE.Mesh | null)[]>([]);
+  const ponds = useRef<(THREE.Mesh | null)[]>([]);
   const lastLevel = useRef(-1);
 
   useFrame(({ clock }) => {
     const level = ctl.sim.veg.level;
-    const mat = stream.current?.material as THREE.MeshStandardMaterial | undefined;
+    const mat = streams.current[0]?.material as THREE.MeshStandardMaterial | undefined;
     if (mat) mat.emissiveIntensity = 0.12 + 0.04 * Math.sin(clock.elapsedTime * 1.3);
-    if (level === lastLevel.current || !stream.current || !pond.current) return;
+    if (level === lastLevel.current || streams.current.some((m) => !m) || ponds.current.some((m) => !m)) return;
     lastLevel.current = level;
     const { streamHalfWidth, pondRadius } = waterGeometry(level);
-    stream.current.visible = streamHalfWidth > 0;
-    pond.current.visible = pondRadius > 0;
-    // Ribbon along the stream centre line.
-    const pts = world.streamPath;
-    const verts: number[] = [], idx: number[] = [];
-    const w = streamHalfWidth + 0.6;
-    pts.forEach((p, i) => {
-      const n = pts[Math.min(pts.length - 1, i + 1)], b = pts[Math.max(0, i - 1)];
-      const tx = n.x - b.x, tz = n.z - b.z, L = Math.hypot(tx, tz) || 1;
-      const nx = -tz / L, nz = tx / L;
-      const y = Math.min(world.heightAt(p.x, p.z), world.heightAt(p.x + nx * w, p.z + nz * w), world.heightAt(p.x - nx * w, p.z - nz * w)) + 0.35 + level * 0.3;
-      verts.push(p.x + nx * w, y, p.z + nz * w, p.x - nx * w, y, p.z - nz * w);
-      if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+    world.streams.forEach((pts, si) => {
+      const mesh = streams.current[si]!;
+      // The tributary is narrower (its distance field is offset by 1.2 m).
+      const half = si === 0 ? streamHalfWidth : streamHalfWidth - 1.2;
+      mesh.visible = half > 0.05;
+      if (!mesh.visible) return;
+      const verts: number[] = [], idx: number[] = [];
+      const w = half + 0.6;
+      pts.forEach((p, i) => {
+        const n = pts[Math.min(pts.length - 1, i + 1)], b = pts[Math.max(0, i - 1)];
+        const tx = n.x - b.x, tz = n.z - b.z, L = Math.hypot(tx, tz) || 1;
+        const nx = -tz / L, nz = tx / L;
+        const y = Math.min(world.heightAt(p.x, p.z), world.heightAt(p.x + nx * w, p.z + nz * w), world.heightAt(p.x - nx * w, p.z - nz * w)) + 0.35 + level * 0.3;
+        verts.push(p.x + nx * w, y, p.z + nz * w, p.x - nx * w, y, p.z - nz * w);
+        if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+      });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      mesh.geometry.dispose();
+      mesh.geometry = g;
     });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    stream.current.geometry.dispose();
-    stream.current.geometry = g;
-    pond.current.scale.setScalar(Math.max(0.01, pondRadius + 0.8));
-    pond.current.position.set(world.pond.x, world.heightAt(world.pond.x, world.pond.z) + 0.35 + level * 0.4, world.pond.z);
+    world.ponds.forEach((p, pi) => {
+      const mesh = ponds.current[pi]!;
+      const r = pondRadius > 0 ? pondRadius + (p.r - 10) : 0;
+      mesh.visible = r > 0.2;
+      mesh.scale.setScalar(Math.max(0.01, r + 0.8));
+      mesh.position.set(p.x, world.heightAt(p.x, p.z) + 0.35 + level * 0.4, p.z);
+    });
   });
 
   return (
     <group>
-      <mesh ref={stream} receiveShadow>
-        <bufferGeometry />
-        <meshStandardMaterial color="#3b7fa8" emissive="#2a6f9a" emissiveIntensity={0.12} roughness={0.12} metalness={0.1} transparent opacity={0.86} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh ref={pond} rotation-x={-Math.PI / 2} receiveShadow>
-        <circleGeometry args={[1, 40]} />
-        <meshStandardMaterial color="#3b7fa8" emissive="#2a6f9a" emissiveIntensity={0.12} roughness={0.12} metalness={0.1} transparent opacity={0.88} />
-      </mesh>
+      {world.streams.map((_, i) => (
+        <mesh key={`s${i}`} ref={(el) => { streams.current[i] = el; }} receiveShadow>
+          <bufferGeometry />
+          <meshStandardMaterial color="#3b7fa8" emissive="#2a6f9a" emissiveIntensity={0.12} roughness={0.12} metalness={0.1} transparent opacity={0.86} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      {world.ponds.map((_, i) => (
+        <mesh key={`p${i}`} ref={(el) => { ponds.current[i] = el; }} rotation-x={-Math.PI / 2} receiveShadow>
+          <circleGeometry args={[1, 48]} />
+          <meshStandardMaterial color="#3b7fa8" emissive="#2a6f9a" emissiveIntensity={0.12} roughness={0.12} metalness={0.1} transparent opacity={0.88} />
+        </mesh>
+      ))}
     </group>
   );
 }

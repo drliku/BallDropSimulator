@@ -1,3 +1,4 @@
+import { FAUNA_IDS, SPECIES, type FaunaId } from './species';
 /**
  * Every user-adjustable parameter of the model. The UI is generated from PARAM_META, and
  * the simulation reads `sim.params` live, so a slider changes the model itself.
@@ -21,12 +22,15 @@ export interface Params {
   habitat: number;
   seasonality: number;
   weather: number;
+  immigration: number;
 }
 
 export interface Setup {
   seed: number;
   initialDeer: number;
   initialWolves: number;
+  /** Starting numbers of the other species. */
+  fauna: Record<FaunaId, number>;
 }
 
 export const DEFAULT_PARAMS: Params = {
@@ -34,11 +38,11 @@ export const DEFAULT_PARAMS: Params = {
   wolfReproRate: 1,
   deerSpeed: 1,
   wolfSpeed: 1,
-  huntSuccess: 0.26,
+  huntSuccess: 0.3,
   energyCost: 1,
   mortality: 1,
   detectionRadius: 24,
-  wolfSensing: 42,
+  wolfSensing: 50,
   vegGrowth: 0.2,
   vegCapacity: 10,
   drought: 0,
@@ -46,9 +50,13 @@ export const DEFAULT_PARAMS: Params = {
   habitat: 1,
   seasonality: 0.35,
   weather: 0.6,
+  immigration: 0.5,
 };
 
-export const DEFAULT_SETUP: Setup = { seed: 7, initialDeer: 160, initialWolves: 14 };
+export const DEFAULT_FAUNA = Object.fromEntries(FAUNA_IDS.map((id) => [id, SPECIES[id].initial])) as Record<FaunaId, number>;
+export const NO_FAUNA = Object.fromEntries(FAUNA_IDS.map((id) => [id, 0])) as Record<FaunaId, number>;
+
+export const DEFAULT_SETUP: Setup = { seed: 7, initialDeer: SPECIES.deer.initial, initialWolves: SPECIES.wolf.initial, fauna: DEFAULT_FAUNA };
 
 export type ParamGroup = 'biology' | 'environment';
 
@@ -81,5 +89,6 @@ export const PARAM_META: Record<keyof Params, ParamMeta> = {
   water: { label: 'Water availability', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'How full the streams and pond are. Low water shrinks drinking spots and the moist ground around them.' },
   habitat: { label: 'Habitat quality', group: 'environment', min: 0.3, max: 1.6, step: 0.05, format: x, help: 'Scales plant carrying capacity across the landscape (soil fertility).' },
   seasonality: { label: 'Seasonal variation', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'Amplitude of the yearly cycle in plant growth (100-day year). At 100% growth stops completely in mid-winter.' },
+  immigration: { label: 'Wildlife immigration', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'How readily animals of the other twelve species wander in from outside the valley when their numbers here are very low. Deer and wolves never immigrate, so the experiments stay closed. 0% makes every species a closed population.' },
   weather: { label: 'Weather variability', group: 'environment', min: 0, max: 1, step: 0.01, format: pct, help: 'How often and how strongly rain, storms, fog and snow roll in. Rain speeds plant growth; fog and rain shorten sight; snow slows animals and helps wolves. 0% keeps the sky clear.' },
 };

@@ -6,8 +6,11 @@ import { Ecosystem } from '../src/sim/ecosystem';
 import { DEFAULT_PARAMS, DEFAULT_SETUP } from '../src/sim/params';
 import { EXPERIMENTS } from '../src/sim/experiments';
 import { TICKS_PER_DAY } from '../src/sim/world';
+import { FAUNA_IDS } from '../src/sim/species';
 
-const [name = 'balanced', daysArg = '300', seedArg] = process.argv.slice(2);
+const others = process.argv.includes('--all');
+
+const [name = 'balanced', daysArg = '300', seedArg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const exp = EXPERIMENTS.find((e) => e.id === name);
 const setup = { ...DEFAULT_SETUP, ...(exp?.setup ?? {}), ...(seedArg ? { seed: Number(seedArg) } : {}) };
 const params = { ...DEFAULT_PARAMS, ...(exp?.params ?? {}) };
@@ -27,6 +30,7 @@ for (let d = 0; d <= days; d++) {
       `${String(c.births.deer).padStart(6)}/${String(c.births.wolf).padEnd(4)} ${String(sim.totalDeaths('deer')).padStart(5)}/${String(sim.totalDeaths('wolf')).padEnd(5)} ` +
       `${String(c.hunts.kills).padStart(5)}/${String(c.hunts.attempts).padEnd(6)} pred ${dc.predation} starv ${dc.starvation} thirst ${dc.dehydration} old ${dc['old age']} nat ${dc.natural}`,
     );
+    if (others) console.log('      ' + FAUNA_IDS.map((id) => `${id} ${sim.count(id)}`).join(' · '));
   }
   if (d === days) break;
   for (let t = 0; t < TICKS_PER_DAY; t++) sim.step();
