@@ -134,3 +134,75 @@ npm run build    # type-check and build to dist/
 - **Mirror in front or on the ceiling**, the latter being a light clock with diagonal paths seen from the
   track. There are three guided experiments, a live dashboard, a dynamic explanation, and a blinking passenger
   whose reflection and speech bubble react to the speed.
+
+# Forest Ecosystem Lab (`ecosystem/`)
+
+A 3D predator–prey ecosystem: wolves, deer and vegetation in a forest with a stream and a pond, simulated
+animal by animal. React, TypeScript, Tailwind, Three.js and React Three Fiber, in The Brain Maze style.
+
+```bash
+cd ecosystem
+npm install
+npm run dev                      # local dev server
+npm test                         # 10 ecological validation tests (vitest)
+npm run build                    # type-check and build to dist/
+npm run sim -- balanced 200 7    # headless run: scenario, days, seed; prints a population table
+```
+
+- **Agent-based model** (`src/sim/`). Every animal has energy, hunger, hydration, stamina, age, sex,
+  reproductive state and a lifespan.
+  - **Deer** choose between eating, drinking, resting, mating, herding and wandering by utility, and flee
+    when they notice a wolf. How far away they notice depends on what the wolf is doing, on daylight and on
+    how desperate the deer is.
+  - **Wolves** live in packs with a leader. They search, stalk and then chase, limited by stamina. Capture
+    probability depends on the deer's condition, the pack's help, cover and light.
+  - **Carcasses** leave meat that decays, and wolves gain energy only from meat.
+  - **Vegetation** grows logistically on a 64×64 grid. Growth is shaped by moisture, distance to water,
+    forest cover, season and drought.
+  - **Lotka–Volterra** is not the engine. The Model tab fits its coefficients to the run as a reference.
+- **Engine**:
+  - fixed timestep (120 ticks per simulated day, 10 ticks/s per 1× of speed);
+  - capped catch-up, so a slow device runs slower rather than freezing;
+  - interpolated rendering;
+  - a spatial hash for neighbour queries;
+  - instanced meshes for animals, trees and grass;
+  - one seeded RNG. The same seed, parameters and actions reproduce a run exactly. The landscape is fixed;
+    the seed sets the animals and every chance event.
+- **Interface**:
+  - Left panel: the six experiments (A–F), each with hypotheses and outcomes measured since it started;
+    initial populations and add/remove buttons; biology and environment sliders; seed and saved runs.
+  - Centre: the 3D view, with free, follow, top-down and cinematic cameras, heatmaps (vegetation, deer,
+    wolves, resources, predation) and a day/night toggle.
+  - Right panel: statistics with trend arrows and death causes, the animal inspector, a food web with
+    measured energy flows, and the Lotka–Volterra comparison.
+  - Bottom: the population graph, with hover, range, pause, clear, series toggles and saved runs drawn
+    as dashed lines.
+  - Shortcuts: Space play/pause, → step, 1–4 speed, F follow, Esc deselect.
+- **Validation** (`src/sim/ecosystem.test.ts`) checks that:
+  - animals with no food starve;
+  - wolves without meat gain nothing;
+  - vegetation cannot regrow at zero growth, or under full drought with no water;
+  - deer reproduction is limited by food, and energy accounting balances;
+  - population counters always match the living animals, with no death counted twice;
+  - animals stay inside the world;
+  - seeds reproduce runs, and reset is exact;
+  - extinction is handled safely;
+  - results do not depend on playback speed.
+
+**Simplifications and limitations**:
+- **Time is compressed.** A tick is about 12 ecological minutes but about one second of movement. Lifespans
+  are 95 days for deer and 170 days for wolves, and a "year" is 100 days, so cycles play out in minutes.
+- **Outcomes depend on the seed.** In headless runs with default settings:
+  - seeds 7 and 99 kept both species for 400+ days;
+  - seed 20241 cycled and then lost its wolves;
+  - seed 5 crashed.
+  Small populations are fragile, as in real ecology. Treat a single run as one possible history, not a
+  prediction.
+- **Simplified biology:**
+  - wolves do not need water;
+  - there are no other species, diseases, territories between packs, or immigration;
+  - only a pack's dominant female breeds (a second breeder is allowed in large, well-fed packs);
+  - vegetation is one generic biomass layer.
+- **Performance:** the world is 200 m across, and above a few hundred animals slower devices fall behind
+  at 10×. The interface shows a notice when that happens.
+- **This is an exploration tool**, not a calibrated model of any real population.

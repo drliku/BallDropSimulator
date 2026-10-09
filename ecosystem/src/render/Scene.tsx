@@ -1,0 +1,219 @@
+import { OrbitControls, Stars } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
+import * as THREE from 'three';
+import type { OrbitControls as OrbitImpl } from 'three-stdlib';
+import { useController } from '../runtime/context';
+import type { Controller } from '../runtime/controller';
+import { ControllerContext } from '../runtime/context';
+import { getWorld } from '../sim/world';
+import { AnimalHerd, Carcasses } from './Animals';
+import { Flora, Grass, HeatOverlay, Terrain, Water } from './World';
+
+const world = getWorld();
+
+/** Advances the simulation from the render loop (fixed timestep inside the controller). */
+function Driver() {
+  const ctl = useController();
+  useFrame((_, dt) => ctl.frame(dt, performance.now()));
+  return null;
+}
+
+const SKY = { night: new THREE.Color('#0a1122'), dawn: new THREE.Color('#e4a272'), day: new THREE.Color('#9fc4e3') };
+
+/** Sun, moon, sky colour and fog from the model's time of day. */
+function Lighting() {
+  const ctl = useController();
+  const sun = useRef<THREE.DirectionalLight>(null);
+  const moon = useRef<THREE.DirectionalLight>(null);
+  const hemi = useRef<THREE.HemisphereLight>(null);
+  const stars = useRef<THREE.Points>(null);
+  const { scene } = useThree();
+  const bg = useMemo(() => new THREE.Color(), []);
+  const fog = useMemo(() => new THREE.Fog('#9fc4e3', 160, 420), []);
+  scene.fog = fog;
+
+  useFrame(() => {
+    // At high speed a full day passes in about a second; show steady daylight instead of strobing.
+    const visualCycle = ctl.dayNight && ctl.speed <= 2;
+    const t = visualCycle ? ctl.sim.timeOfDay : 0.58;
+    const elev = Math.sin(2 * Math.PI * (t - 0.25));
+    const day = Math.min(1, Math.max(0, (elev + 0.12) / 0.4));
+    const golden = Math.max(0, 1 - Math.abs(elev) / 0.35) * day;
+    const ang = 2 * Math.PI * (t - 0.25);
+    if (sun.current) {
+      sun.current.position.set(Math.cos(ang) * 160, Math.max(8, Math.sin(ang) * 180), 60);
+      sun.current.intensity = 2.4 * day;
+      sun.current.color.setRGB(1, 0.85 + 0.15 * (1 - golden), 0.7 + 0.3 * (1 - golden));
+    }
+    if (moon.current) moon.current.intensity = 0.35 * (1 - day);
+    if (hemi.current) hemi.current.intensity = 0.25 + 0.65 * day;
+    bg.copy(SKY.night).lerp(SKY.day, day).lerp(SKY.dawn, golden * 0.55);
+    scene.background = bg;
+    fog.color.copy(bg);
+    if (stars.current) stars.current.visible = day < 0.4;
+  });
+
+  return (
+    <>
+      <hemisphereLight ref={hemi} args={['#dfefff', '#4b5a33', 0.9]} />
+      <directionalLight
+        ref={sun}
+        castShadow
+        intensity={2.4}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-120}
+        shadow-camera-right={120}
+        shadow-camera-top={120}
+        shadow-camera-bottom={-120}
+        shadow-camera-far={500}
+        shadow-bias={-0.0006}
+      />
+      <directionalLight ref={moon} position={[-80, 120, -60]} color="#9fb6ff" intensity={0} />
+      <Stars ref={stars as never} radius={300} depth={60} count={2500} factor={5} fade speed={0.3} />
+    </>
+  );
+}
+
+const DEFAULT_CAM = new THREE.Vector3(10, 62, 105);
+
+/** Orbit controls plus follow, top-down, cinematic and reset modes, with smooth transitions. */
+function CameraRig() {
+  const ctl = useController();
+  const controls = useRef<OrbitImpl>(null);
+  const { camera } = useThree();
+  (window as unknown as { ecosystemCamera: THREE.Camera }).ecosystemCamera = camera;
+  const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; t: number } | null>(null);
+  const lastCmd = useRef(0);
+  const lastFollow = useRef(new THREE.Vector3());
+
+  useFrame((_, dt) => {
+    const c = controls.current;
+    if (!c) return;
+    const cmd = ctl.cameraCommand;
+    if (cmd.n !== lastCmd.current) {
+      lastCmd.current = cmd.n;
+      const tgt = c.target.clone();
+      if (cmd.kind === 'reset') goal.current = { pos: DEFAULT_CAM.clone(), target: new THREE.Vector3(0, 0, 0), t: 0 };
+      if (cmd.kind === 'top') goal.current = { pos: new THREE.Vector3(tgt.x, 230, tgt.z + 0.1), target: new THREE.Vector3(tgt.x, 0, tgt.z), t: 0 };
+      if (cmd.kind === 'cinematic') goal.current = { pos: new THREE.Vector3(150, 70, 0), target: new THREE.Vector3(0, 0, 0), t: 0 };
+      if (cmd.kind === 'follow') {
+        const a = ctl.sim.byId.get(ctl.selectedId);
+        if (a) {
+          const p = new THREE.Vector3(a.x, world.heightAt(a.x, a.z) + 1, a.z);
+          goal.current = { pos: p.clone().add(new THREE.Vector3(-14, 11, 14)), target: p, t: 0 };
+          lastFollow.current.copy(p);
+        }
+      }
+    }
+    // Smooth fly-to
+    if (goal.current) {
+      const g = goal.current;
+      g.t = Math.min(1, g.t + dt * 1.2);
+      const k = 1 - Math.pow(1 - g.t, 3);
+      camera.position.lerp(g.pos, k * 0.25 + 0.02);
+      c.target.lerp(g.target, k * 0.25 + 0.02);
+      if (g.t >= 1 && camera.position.distanceTo(g.pos) < 0.5) goal.current = null;
+    }
+    // Follow: move the target and camera together with the animal (interpolated).
+    if (ctl.cameraMode === 'follow' && !goal.current) {
+      const a = ctl.sim.byId.get(ctl.selectedId);
+      if (a) {
+        const x = a.px + (a.x - a.px) * ctl.alpha, z = a.pz + (a.z - a.pz) * ctl.alpha;
+        const p = new THREE.Vector3(x, world.heightAt(x, z) + 1, z);
+        const delta = p.clone().sub(lastFollow.current);
+        if (delta.length() < 20) { camera.position.add(delta); c.target.add(delta); }
+        lastFollow.current.copy(p);
+        c.target.lerp(p, 0.1);
+      }
+    }
+    c.autoRotate = ctl.cameraMode === 'cinematic';
+    c.autoRotateSpeed = 0.35;
+    c.update();
+  });
+
+  return (
+    <OrbitControls
+      ref={controls as never}
+      makeDefault
+      enableDamping
+      dampingFactor={0.08}
+      maxPolarAngle={Math.PI * 0.47}
+      minDistance={6}
+      maxDistance={340}
+      screenSpacePanning={false}
+    />
+  );
+}
+
+/** Ring under the selected animal and, optionally, its detection radius traced over the terrain. */
+function SelectionMarker() {
+  const ctl = useController();
+  const ring = useRef<THREE.Mesh>(null);
+  const SEGS = 72;
+  const lineGeo = useMemo(() => new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array((SEGS + 1) * 3), 3)), []);
+  const lineMat = useMemo(() => new THREE.LineBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.8 }), []);
+  const lineObj = useMemo(() => new THREE.Line(lineGeo, lineMat), [lineGeo, lineMat]);
+
+  useFrame(({ clock }) => {
+    const a = ctl.sim.byId.get(ctl.selectedId);
+    if (!ring.current) return;
+    ring.current.visible = !!a;
+    lineObj.visible = !!a && ctl.showRadius;
+    if (!a) return;
+    const x = a.px + (a.x - a.px) * ctl.alpha, z = a.pz + (a.z - a.pz) * ctl.alpha;
+    ring.current.position.set(x, world.heightAt(x, z) + 0.12, z);
+    ring.current.scale.setScalar(1 + 0.08 * Math.sin(clock.elapsedTime * 4));
+    if (ctl.showRadius) {
+      const p = ctl.sim.params;
+      const r = a.species === 'deer' ? p.detectionRadius * (0.5 + 0.5 * ctl.sim.daylight) : p.wolfSensing * (0.75 + 0.25 * ctl.sim.daylight);
+      lineMat.color.set(a.species === 'deer' ? '#7cc4ff' : '#ff7a6b');
+      const pos = lineGeo.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i <= SEGS; i++) {
+        const ang = (i / SEGS) * Math.PI * 2;
+        const px = x + Math.cos(ang) * r, pz = z + Math.sin(ang) * r;
+        pos.setXYZ(i, px, world.heightAt(px, pz) + 0.3, pz);
+      }
+      pos.needsUpdate = true;
+    }
+  });
+
+  return (
+    <>
+      <mesh ref={ring} rotation-x={-Math.PI / 2} visible={false}>
+        <ringGeometry args={[1.1, 1.45, 40]} />
+        <meshBasicMaterial color="#ffe066" transparent opacity={0.9} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      <primitive object={lineObj} />
+    </>
+  );
+}
+
+export function Scene({ controller }: { controller: Controller }) {
+  return (
+    <Canvas
+      shadows
+      dpr={[1, 1.75]}
+      camera={{ position: DEFAULT_CAM.toArray(), fov: 45, near: 0.5, far: 1200 }}
+      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      onPointerMissed={() => controller.selectedId !== -1 && controller.cameraMode !== 'follow' && controller.deselect()}
+    >
+      {/* Context does not cross the R3F reconciler boundary, so provide it again inside. */}
+      <ControllerContext.Provider value={controller}>
+        <Driver />
+        <Lighting />
+        <Terrain />
+        <HeatOverlay />
+        <Water />
+        <Grass />
+        <Flora />
+        <AnimalHerd species="deer" />
+        <AnimalHerd species="wolf" />
+        <Carcasses />
+        <SelectionMarker />
+        <CameraRig />
+      </ControllerContext.Provider>
+    </Canvas>
+  );
+}
