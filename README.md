@@ -4,11 +4,15 @@ An interactive, browser-based Galton board. Balls fall from a dispenser, bounce 
 rows of pegs, and pile up in bins. Over many drops the pile becomes a binomial distribution,
 and in the symmetric case it looks more and more like a normal distribution.
 
+Styled for **The Brain Maze**: coral `#F37064` on navy `#243056`, the brain mark from the logo, and the
+logo's own typeface, *Brain* by Vladimir Nikolic (`fonts/Brain.woff2`), for headings, labels and big numbers.
+Body text uses Saira. Characters that Brain lacks, such as `%`, `/` and `—`, fall back to Saira Semi Condensed.
+
 **Run it:** open `index.html` in any modern browser. There is no build step and nothing to install.
 
 ## Features
 
-- **Canvas animation** at 60 FPS: glowing cyan and blue balls hop from peg to peg in parabolic
+- **Canvas animation** at 60 FPS: glowing coral balls hop from peg to peg in parabolic
   arcs. Pegs, walls, and the grid are pre-rendered once, and balls are drawn from cached sprites,
   so thousands of balls stay smooth.
 - **Controls:** Drop/Pause, ball count (100 / 500 / 1,000 / 5,000), peg rows (5–20),
@@ -40,5 +44,7 @@ confined to the peg triangle, no ball can escape the board.
 | File | Purpose |
 | --- | --- |
 | `index.html` | Page structure, controls, statistics panel, explanation |
-| `styles.css` | Dark-navy scientific theme and responsive layout |
+| `styles.css` | Brain Maze theme (coral on navy) and responsive layout |
+| `fonts/Brain.woff2` | Brain typeface (from the logo), converted to WOFF2 |
+| `assets/brain-mark.png` | Brain mark cropped from the logo |
 | `app.js` | Random walk, animation, rendering, statistics, interaction |

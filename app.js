@@ -14,6 +14,8 @@
   const $ = (id) => document.getElementById(id);
   const fmtInt = (n) => n.toLocaleString('en-US');
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const FONT_DISPLAY = '"Brain", "Saira Semi Condensed", "Arial Narrow", sans-serif';
+  const FONT_BODY = '"Saira", system-ui, sans-serif';
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ------------------------------------------------------------------ Math
@@ -237,12 +239,12 @@
   function buildSprites() {
     const r = geo.ballR;
     sprites = [
-      makeSprite('#a5f3fc', 'rgba(34,211,238,A)', r),
-      makeSprite('#67e8f9', 'rgba(6,182,212,A)', r),
-      makeSprite('#93c5fd', 'rgba(59,130,246,A)', r),
-      makeSprite('#7dd3fc', 'rgba(14,165,233,A)', r),
+      makeSprite('#ffd6cd', 'rgba(243,112,100,A)', r),
+      makeSprite('#ffbcae', 'rgba(232,88,78,A)', r),
+      makeSprite('#ffc9b2', 'rgba(247,138,104,A)', r),
+      makeSprite('#ffe0da', 'rgba(255,130,120,A)', r),
     ];
-    tracerSprite = makeSprite('#fff7d6', 'rgba(251,191,36,A)', r * 1.25);
+    tracerSprite = makeSprite('#ffffff', 'rgba(255,244,236,A)', r * 1.25);
   }
 
   function buildBinPattern() {
@@ -260,8 +262,8 @@
     x.scale(c.width / tw, c.height / th);
     const dot = (cx, cy) => {
       const gr = x.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 0, cx, cy, r);
-      gr.addColorStop(0, 'rgba(224,250,255,0.55)');
-      gr.addColorStop(1, 'rgba(34,211,238,0.05)');
+      gr.addColorStop(0, 'rgba(255,240,235,0.5)');
+      gr.addColorStop(1, 'rgba(243,112,100,0.05)');
       x.fillStyle = gr;
       x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
     };
@@ -284,11 +286,11 @@
 
     // Background + subtle grid
     const bg = x.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.max(w, h) * 0.8);
-    bg.addColorStop(0, '#0e1a3c');
-    bg.addColorStop(1, '#060c1f');
+    bg.addColorStop(0, '#202c56');
+    bg.addColorStop(1, '#111831');
     x.fillStyle = bg;
     x.fillRect(0, 0, w, h);
-    x.strokeStyle = 'rgba(148,163,184,0.055)';
+    x.strokeStyle = 'rgba(170,182,230,0.06)';
     x.lineWidth = 1;
     x.beginPath();
     const gs = 24;
@@ -298,7 +300,7 @@
 
     // Triangle guides (the reachable region of the walk)
     const half = geo.dx * 0.5;
-    x.strokeStyle = 'rgba(56,189,248,0.10)';
+    x.strokeStyle = 'rgba(243,112,100,0.16)';
     x.lineWidth = 1;
     x.setLineDash([3, 5]);
     x.beginPath();
@@ -319,10 +321,10 @@
     x.moveTo(geo.cx + fw, fTop);
     x.lineTo(geo.cx + neck, geo.dispY - 6);
     x.lineTo(geo.cx + neck, geo.dispY);
-    x.strokeStyle = 'rgba(148,197,255,0.55)';
+    x.strokeStyle = 'rgba(243,112,100,0.85)';
     x.lineWidth = 2;
     x.lineCap = 'round';
-    x.shadowColor = 'rgba(34,211,238,0.5)';
+    x.shadowColor = 'rgba(243,112,100,0.45)';
     x.shadowBlur = 8;
     x.stroke();
     x.shadowBlur = 0;
@@ -334,13 +336,13 @@
       for (let j = 0; j <= r; j++) {
         const px = pegX(r, j);
         const halo = x.createRadialGradient(px, y, 0, px, y, geo.pegR * 3);
-        halo.addColorStop(0, 'rgba(148,197,255,0.18)');
-        halo.addColorStop(1, 'rgba(148,197,255,0)');
+        halo.addColorStop(0, 'rgba(255,228,220,0.13)');
+        halo.addColorStop(1, 'rgba(255,228,220,0)');
         x.fillStyle = halo;
         x.beginPath(); x.arc(px, y, geo.pegR * 3, 0, Math.PI * 2); x.fill();
         const body = x.createRadialGradient(px - geo.pegR * 0.4, y - geo.pegR * 0.4, 0, px, y, geo.pegR);
-        body.addColorStop(0, '#f1f5ff');
-        body.addColorStop(1, '#7c8db5');
+        body.addColorStop(0, '#fff6f2');
+        body.addColorStop(1, '#8e94b4');
         x.fillStyle = body;
         x.beginPath(); x.arc(px, y, geo.pegR, 0, Math.PI * 2); x.fill();
       }
@@ -349,22 +351,22 @@
     // Bins: back panel, walls and floor
     const left = binX(0) - half, right = binX(N) + half;
     const back = x.createLinearGradient(0, geo.binTop, 0, geo.binBottom);
-    back.addColorStop(0, 'rgba(30,58,138,0.04)');
-    back.addColorStop(1, 'rgba(30,58,138,0.22)');
+    back.addColorStop(0, 'rgba(10,14,30,0.04)');
+    back.addColorStop(1, 'rgba(10,14,30,0.32)');
     x.fillStyle = back;
     x.fillRect(left, geo.binTop, right - left, geo.binH);
-    x.fillStyle = 'rgba(148,180,230,0.35)';
+    x.fillStyle = 'rgba(255,228,220,0.28)';
     for (let k = 0; k <= N + 1; k++) {
       const wx = binX(0) - half + k * geo.dx;
       x.fillRect(wx - geo.wall / 2, geo.binTop, geo.wall, geo.binH);
     }
-    x.fillStyle = 'rgba(148,180,230,0.5)';
+    x.fillStyle = 'rgba(255,228,220,0.5)';
     x.fillRect(left - geo.wall / 2, geo.binBottom, right - left + geo.wall, 2);
 
     // Bin labels (thinned out when crowded)
     const every = geo.dx < 18 ? 4 : geo.dx < 26 ? 2 : 1;
-    x.fillStyle = 'rgba(139,155,184,0.75)';
-    x.font = `500 ${geo.dx < 26 ? 9 : 10}px "JetBrains Mono", monospace`;
+    x.fillStyle = 'rgba(163,172,201,0.8)';
+    x.font = `400 ${geo.dx < 26 ? 11 : 13}px ${FONT_DISPLAY}`;
     x.textAlign = 'center';
     x.textBaseline = 'top';
     if (geo.binBottom + 13 < h) {
@@ -577,8 +579,8 @@
       ctx.lineTo(geo.cx - neck + 1.5, yNeck);
       ctx.closePath();
       const hg = ctx.createLinearGradient(0, yLevel, 0, yNeck);
-      hg.addColorStop(0, 'rgba(103,232,249,0.35)');
-      hg.addColorStop(1, 'rgba(59,130,246,0.55)');
+      hg.addColorStop(0, 'rgba(255,160,146,0.45)');
+      hg.addColorStop(1, 'rgba(243,112,100,0.75)');
       ctx.fillStyle = hg;
       ctx.fill();
     }
@@ -594,8 +596,8 @@
         const hgt = Math.min(geo.binH, c * uh);
         const top = geo.binBottom - hgt;
         const grad = ctx.createLinearGradient(0, geo.binBottom - geo.binH, 0, geo.binBottom);
-        grad.addColorStop(0, 'rgba(103,232,249,0.95)');
-        grad.addColorStop(1, 'rgba(37,99,235,0.85)');
+        grad.addColorStop(0, 'rgba(255,152,138,0.97)');
+        grad.addColorStop(1, 'rgba(214,80,70,0.9)');
         ctx.fillStyle = grad;
         ctx.globalAlpha = state.hoverBin === k ? 1 : 0.82;
         ctx.fillRect(left, top, inner, hgt);
@@ -607,19 +609,19 @@
           ctx.fillRect(0, -hgt, inner, hgt);
           ctx.restore();
         }
-        ctx.fillStyle = `rgba(224,250,255,${0.55 + 0.45 * f})`;
+        ctx.fillStyle = `rgba(255,238,232,${0.55 + 0.45 * f})`;
         ctx.fillRect(left, top, inner, 1.5);
       }
       if (f > 0.02) {
         const top = geo.binBottom - Math.min(geo.binH, c * uh);
         const glow = ctx.createRadialGradient(binX(k), top, 0, binX(k), top, dx * 0.9);
-        glow.addColorStop(0, `rgba(103,232,249,${0.35 * f})`);
-        glow.addColorStop(1, 'rgba(103,232,249,0)');
+        glow.addColorStop(0, `rgba(255,150,135,${0.4 * f})`);
+        glow.addColorStop(1, 'rgba(255,150,135,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(binX(k) - dx, top - dx, dx * 2, dx * 2);
       }
       if (state.hoverBin === k) {
-        ctx.strokeStyle = 'rgba(34,211,238,0.8)';
+        ctx.strokeStyle = 'rgba(243,112,100,0.95)';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(left - 0.5, geo.binTop, inner + 1, geo.binH);
       }
@@ -634,13 +636,13 @@
       ctx.save();
       ctx.beginPath();
       smoothPath(ctx, pts);
-      ctx.strokeStyle = 'rgba(251,191,36,0.95)';
+      ctx.strokeStyle = 'rgba(255,201,168,0.95)';
       ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(251,191,36,0.7)';
+      ctx.shadowColor = 'rgba(255,201,168,0.5)';
       ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = '#fde68a';
+      ctx.fillStyle = '#ffe2cf';
       const pr = dx < 20 ? 1.6 : 2.4;
       for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
@@ -662,7 +664,7 @@
         for (const [r, j] of tr.hits) {
           ctx.beginPath();
           ctx.arc(pegX(r, j), pegY(r), geo.pegR + 2.5, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(251,191,36,0.9)';
+          ctx.strokeStyle = 'rgba(255,244,236,0.9)';
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
@@ -670,7 +672,7 @@
           ctx.beginPath();
           ctx.moveTo(tr.trail[0][0], tr.trail[0][1]);
           for (let i = 1; i < tr.trail.length; i++) ctx.lineTo(tr.trail[i][0], tr.trail[i][1]);
-          ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+          ctx.strokeStyle = 'rgba(255,244,236,0.5)';
           ctx.lineWidth = 1.5;
           ctx.lineJoin = 'round';
           ctx.setLineDash([]);
@@ -736,15 +738,15 @@
 
     // Grid + y axis
     const step = niceStep(maxV, 4);
-    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.font = `400 12px ${FONT_DISPLAY}`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for (let v = 0; v <= maxV + 1e-12; v += step) {
       const y = Math.round(yOf(v)) + 0.5;
-      ctx.strokeStyle = v === 0 ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.09)';
+      ctx.strokeStyle = v === 0 ? 'rgba(170,182,230,0.35)' : 'rgba(170,182,230,0.09)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(plotL, y); ctx.lineTo(plotR, y); ctx.stroke();
-      ctx.fillStyle = 'rgba(139,155,184,0.8)';
+      ctx.fillStyle = 'rgba(163,172,201,0.85)';
       const label = isProb ? (step < 0.01 ? v.toFixed(3) : v.toFixed(2)) : (v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k' : String(Math.round(v)));
       ctx.fillText(label, plotL - 6, y);
     }
@@ -753,8 +755,8 @@
     const bwAll = histBinRect(0).w;
     const gap = Math.min(4, bwAll * 0.18);
     const barGrad = ctx.createLinearGradient(0, plotT, 0, plotB);
-    barGrad.addColorStop(0, '#67e8f9');
-    barGrad.addColorStop(1, '#2563eb');
+    barGrad.addColorStop(0, '#ff9a8d');
+    barGrad.addColorStop(1, '#d4524a');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const labelEvery = bwAll < 14 ? 4 : bwAll < 22 ? 2 : 1;
@@ -764,7 +766,7 @@
       const y = yOf(v);
       const hovered = state.hoverBin === k;
       if (hovered) {
-        ctx.fillStyle = 'rgba(34,211,238,0.08)';
+        ctx.fillStyle = 'rgba(243,112,100,0.1)';
         ctx.fillRect(x, plotT, bw, plotH);
       }
       if (v > 0) {
@@ -776,7 +778,7 @@
         ctx.globalAlpha = 1;
       }
       if (k % labelEvery === 0) {
-        ctx.fillStyle = hovered ? '#e0faff' : 'rgba(139,155,184,0.8)';
+        ctx.fillStyle = hovered ? '#fff3ea' : 'rgba(163,172,201,0.85)';
         ctx.fillText(String(k), x + bw / 2, plotB + 6);
       }
     }
@@ -794,7 +796,7 @@
         const py = yOf(dens * scale);
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
-      ctx.strokeStyle = 'rgba(192,132,252,0.95)';
+      ctx.strokeStyle = 'rgba(159,176,255,0.95)';
       ctx.lineWidth = 1.6;
       ctx.setLineDash([5, 4]);
       ctx.stroke();
@@ -807,19 +809,19 @@
     ctx.save();
     ctx.beginPath();
     smoothPath(ctx, pts);
-    ctx.strokeStyle = 'rgba(251,191,36,0.95)';
+    ctx.strokeStyle = 'rgba(255,201,168,0.95)';
     ctx.lineWidth = 2;
     if (n === 0) ctx.setLineDash([4, 4]);
-    ctx.shadowColor = 'rgba(251,191,36,0.6)';
+    ctx.shadowColor = 'rgba(255,201,168,0.5)';
     ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = '#fde68a';
+    ctx.fillStyle = '#ffe2cf';
     for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, bwAll < 16 ? 1.8 : 2.6, 0, Math.PI * 2); ctx.fill(); }
 
     if (n === 0) {
-      ctx.fillStyle = 'rgba(139,155,184,0.7)';
-      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(163,172,201,0.75)';
+      ctx.font = `500 13px ${FONT_BODY}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(isProb ? 'Theoretical probabilities — drop balls to compare' : `Expected shape for ${fmtInt(state.target)} balls — drop balls to compare`, (plotL + plotR) / 2, plotT + 14);
@@ -1160,6 +1162,9 @@
   ro.observe(boardCanvas);
   ro.observe(histCanvas);
   window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', () => { layoutBoard(); layoutHist(); });
+
+  // Canvas text is rasterized once into the static layer; redraw when the brand font arrives.
+  if (document.fonts) document.fonts.ready.then(() => { layoutBoard(); state.histDirty = true; });
 
   requestAnimationFrame((t) => { last = t; frame(t); });
 })();

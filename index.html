@@ -3,23 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Galton Board Simulator</title>
+  <title>Brain Maze Galton Board</title>
   <meta name="description" content="An interactive Galton board that shows how random left/right bounces build a binomial — and eventually normal — distribution." />
-  <meta name="theme-color" content="#070d1d" />
+  <meta name="theme-color" content="#121a33" />
+  <link rel="icon" href="assets/brain-mark.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&family=Saira+Semi+Condensed:wght@400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-        <circle cx="16" cy="7" r="2.2" />
-        <circle cx="11" cy="14" r="2.2" /><circle cx="21" cy="14" r="2.2" />
-        <circle cx="6" cy="21" r="2.2" /><circle cx="16" cy="21" r="2.2" /><circle cx="26" cy="21" r="2.2" />
-        <path d="M3 29 Q16 18 29 29" fill="none" stroke-width="2" />
-      </svg>
+      <div class="wordmark" aria-label="The Brain Maze">
+        <span class="wordmark-text" aria-hidden="true"><span>The Brain</span><span>Maze</span></span>
+        <img class="brand-mark" src="assets/brain-mark.png" alt="" width="42" height="42" />
+      </div>
+      <span class="brand-divider" aria-hidden="true"></span>
       <div>
         <h1>Galton Board</h1>
         <p class="tagline">How randomness builds a predictable pattern</p>
