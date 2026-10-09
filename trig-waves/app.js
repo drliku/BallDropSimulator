@@ -17,14 +17,15 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const COLORS = {
-    sin: '#22d3ee', sinRGB: '34,211,238',
-    cos: '#fb923c', cosRGB: '251,146,60',
-    text: '#e6edf7', muted: '#93a3c0', faint: '#62729a',
-    grid: 'rgba(148,163,196,0.07)', axis: 'rgba(148,163,196,0.38)',
+    sin: '#f37064', sinRGB: '243,112,100',
+    cos: '#9fb0ff', cosRGB: '159,176,255',
+    text: '#f6efea', muted: '#a3acc9', faint: '#6f7aa0',
+    grid: 'rgba(170,182,230,0.07)', axis: 'rgba(170,182,230,0.38)',
   };
   const FONT_MONO = '"IBM Plex Mono", ui-monospace, monospace';
   const FONT_MATH = '"STIX Two Text", "Cambria Math", "Times New Roman", serif';
-  const FONT_SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const FONT_SANS = '"Saira", system-ui, sans-serif';
+  const FONT_DISPLAY = '"Brain", "Saira Semi Condensed", "Arial Narrow", sans-serif';
 
   // ------------------------------------------------------------------ State
 
@@ -196,7 +197,7 @@
   function render() {
     const { W, H, U, cx, cy } = G;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#081022';
+    ctx.fillStyle = '#141c38';
     ctx.fillRect(0, 0, W, H);
 
     const th = S.theta;
@@ -230,7 +231,7 @@
     ctx.lineWidth = 1;
     line(G.gx0, Y(0), G.gx1 + 4, Y(0));
     line(G.gx0, Y(2.08), G.gx0, Y(-2.08));
-    const yLabelFont = `${G.small ? 10 : 11}px ${FONT_MONO}`;
+    const yLabelFont = `${G.small ? 11 : 13}px ${FONT_DISPLAY}`;
     for (const v of [-2, -1, 1, 2]) {
       line(G.gx0 - 4, Y(v), G.gx0, Y(v));
       text(v < 0 ? MINUS + Math.abs(v) : String(v), G.gx0 - 7, Y(v), { font: yLabelFont, color: COLORS.faint, align: 'right' });
@@ -241,7 +242,7 @@
       const x = X((k * Math.PI) / 2);
       line(x, Y(0) - 4, x, Y(0) + 4);
       text(tickLabels[k - 1], x, H - 22, { font: `italic ${G.small ? 13 : 14}px ${FONT_MATH}`, color: COLORS.muted, align: 'center' });
-      if (!G.small) text(degLabels[k - 1], x, H - 8, { font: `10px ${FONT_MONO}`, color: COLORS.faint, align: 'center' });
+      if (!G.small) text(degLabels[k - 1], x, H - 8, { font: `11px ${FONT_DISPLAY}`, color: COLORS.faint, align: 'center' });
     }
     text('t', G.gx1 + 2, Y(0) - 10, { font: `italic 15px ${FONT_MATH}`, color: COLORS.muted, align: 'right' });
 
@@ -251,7 +252,7 @@
     line(cx, Y(1.15), cx, Y(-1.15));
     ctx.beginPath();
     ctx.arc(cx, cy, U, 0, TAU);
-    ctx.strokeStyle = 'rgba(219,228,255,0.55)';
+    ctx.strokeStyle = 'rgba(255,236,228,0.55)';
     ctx.lineWidth = 1.4;
     ctx.stroke();
     ctx.lineWidth = 1;
@@ -261,7 +262,7 @@
       if (!len) continue;
       line(cx + Math.cos(a) * U, cy - Math.sin(a) * U, cx + Math.cos(a) * (U - len), cy - Math.sin(a) * (U - len));
     }
-    const lf = `${G.small ? 10 : 11}px ${FONT_MONO}`;
+    const lf = `${G.small ? 11 : 13}px ${FONT_DISPLAY}`;
     text('1', CX(1) + 5, cy + 10, { font: lf, color: COLORS.faint });
     text(MINUS + '1', CX(-1) - 5, cy + 10, { font: lf, color: COLORS.faint, align: 'right' });
     text('1', cx + 6, Y(1) - 8, { font: lf, color: COLORS.faint });
@@ -273,8 +274,8 @@
 
     // ---- Graph content
     if (locked) {
-      text('Waves hidden until you reveal the answer', (G.gx0 + G.gx1) / 2, Y(0) - 18,
-        { font: `13px ${FONT_SANS}`, color: COLORS.faint, align: 'center' });
+      text('WAVES HIDDEN UNTIL YOU REVEAL THE ANSWER', (G.gx0 + G.gx1) / 2, Y(0) - 18,
+        { font: `16px ${FONT_DISPLAY}`, color: COLORS.faint, align: 'center' });
     } else {
       const tEnd = S.trace ? tCur : TAU;
       const ph = phi();
@@ -299,7 +300,7 @@
       if (showSin) { wavePath(Math.sin, S.A, S.w, ph, tEnd); strokeGlow(COLORS.sinRGB, 2); }
 
       // Time cursor
-      ctx.strokeStyle = 'rgba(219,228,255,0.16)';
+      ctx.strokeStyle = 'rgba(255,236,228,0.16)';
       ctx.lineWidth = 1;
       line(gxCur, Y(2.08), gxCur, Y(-2.08));
 
@@ -386,7 +387,7 @@
       // Right-angle marker
       if (Math.abs(s) > 0.08 && Math.abs(c) > 0.08) {
         const m = 7, sx = -Math.sign(c), sy = Math.sign(s);
-        ctx.strokeStyle = 'rgba(219,228,255,0.4)';
+        ctx.strokeStyle = 'rgba(255,236,228,0.4)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(px + sx * m, cy); ctx.lineTo(px + sx * m, cy - sy * m); ctx.lineTo(px, cy - sy * m);
@@ -401,20 +402,20 @@
     ctx.strokeStyle = 'rgba(240,245,255,0.92)';
     ctx.lineWidth = 2;
     line(cx, cy, px, py);
-    dot(cx, cy, 2.5, '#dbe4ff');
+    dot(cx, cy, 2.5, '#ffece4');
 
     // Angle arc
     if (th > 0.001) {
       const r = Math.max(16, U * 0.22);
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, -th, true);
-      ctx.strokeStyle = 'rgba(253,224,71,0.85)';
+      ctx.strokeStyle = 'rgba(255,226,207,0.85)';
       ctx.lineWidth = 1.6;
       ctx.stroke();
-      ctx.fillStyle = 'rgba(253,224,71,0.08)';
+      ctx.fillStyle = 'rgba(255,226,207,0.08)';
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, 0, -th, true); ctx.closePath(); ctx.fill();
       const lr = r + 11, la = th / 2;
-      text('θ', cx + Math.cos(la) * lr, cy - Math.sin(la) * lr, { font: `italic 15px ${FONT_MATH}`, color: '#fde047', align: 'center' });
+      text('θ', cx + Math.cos(la) * lr, cy - Math.sin(la) * lr, { font: `italic 15px ${FONT_MATH}`, color: '#ffe2cf', align: 'center' });
     }
 
     // Leg labels
@@ -445,9 +446,12 @@
       ctx.font = font;
       const lw = ctx.measureText(label).width;
       // Keep the label inside the canvas on both sides.
-      let lx = c >= 0 ? px + ox : px + ox - lw;
-      lx = clamp(lx, 4, G.gx0 - lw - 6);
-      text(label, lx, clamp(py + oy, 50, G.H - 30), { font, color: COLORS.text });
+      const want = c >= 0 ? px + ox : px + ox - lw;
+      const lx = clamp(want, 4, G.gx0 - lw - 6);
+      // If the edge pushed the label back over the point, move it off the point on the side
+      // away from the "cos θ" leg label (which sits below the axis when sin θ ≥ 0).
+      const ly = Math.abs(lx - want) > 2 ? py + (s >= 0 ? -20 : 20) : py + oy;
+      text(label, lx, clamp(ly, 50, G.H - 30), { font, color: COLORS.text });
     }
 
     // Angle readout (top-left)
@@ -460,7 +464,7 @@
   function ring(x, y, r, color) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
     ctx.lineWidth = 1.5; ctx.strokeStyle = color; ctx.stroke();
-    dot(x, y, r - 1.5, '#081022');
+    dot(x, y, r - 1.5, '#141c38');
   }
 
   // Bracket between a cosine peak and the next sine peak: a quarter period.
@@ -479,19 +483,27 @@
     const yb = useTop ? Y(A) - 16 : Y(-A) + 16;
     const x1 = X(tc), x2 = X(ts);
     ctx.save();
-    ctx.strokeStyle = 'rgba(219,228,255,0.75)';
+    ctx.strokeStyle = 'rgba(255,236,228,0.75)';
     ctx.lineWidth = 1.2;
     line(x1, yb, x2, yb);
     line(x1, yb - 4, x1, yb + 4);
     line(x2, yb - 4, x2, yb + 4);
     ctx.setLineDash([2, 3]);
-    ctx.strokeStyle = 'rgba(219,228,255,0.3)';
+    ctx.strokeStyle = 'rgba(255,236,228,0.3)';
     line(x1, yb, x1, useTop ? Y(A) : Y(-A));
     line(x2, yb, x2, useTop ? Y(A) : Y(-A));
     ctx.restore();
-    const label = w === 1 ? '90° phase gap' : `90° phase gap · Δt = ${piFrac(q, 24) || q.toFixed(2)}`;
-    const lx = clamp((x1 + x2) / 2, G.gx0 + 60, G.gx1 - 60);
-    text(label, lx, yb + (useTop ? -10 : 11), { font: `500 11px ${FONT_SANS}`, color: COLORS.text, align: 'center' });
+    // Brain draws lowercase as capitals, so the Δt part is set in the math face.
+    const head = '90° PHASE GAP';
+    const tail = w === 1 ? '' : `  ·  Δt = ${piFrac(q, 24) || q.toFixed(2)}`;
+    const headFont = `13px ${FONT_DISPLAY}`, tailFont = `italic 14px ${FONT_MATH}`;
+    ctx.font = headFont; const hw = ctx.measureText(head).width;
+    ctx.font = tailFont; const tw = tail ? ctx.measureText(tail).width : 0;
+    const total = hw + tw;
+    const lx = clamp((x1 + x2) / 2 - total / 2, G.gx0 + 4, G.gx1 - total);
+    const ly = yb + (useTop ? -10 : 11);
+    text(head, lx, ly, { font: headFont, color: COLORS.text });
+    if (tail) text(tail, lx + hw, ly, { font: tailFont, color: COLORS.text });
   }
 
   function drawGuess() {

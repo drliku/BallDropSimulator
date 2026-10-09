@@ -3,24 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Unit Circle Waves</title>
+  <title>Brain Maze Unit Circle</title>
   <meta name="description" content="Watch a point rotating around the unit circle draw sine and cosine waves, and explore amplitude, frequency and phase." />
-  <meta name="theme-color" content="#0a1124" />
+  <meta name="theme-color" content="#121a33" />
+  <link rel="icon" href="assets/brain-mark.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Saira:wght@400;500;600&family=Saira+Semi+Condensed:wght@400&family=STIX+Two+Text:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="12" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6" />
-        <line x1="12" y1="20" x2="18.4" y2="13.6" stroke="currentColor" stroke-width="1.5" />
-        <path d="M18.4 13.6 H24" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="1.5 1.5" />
-        <path d="M24 20 C26 11, 29 11, 31 20 S36 29, 38 20" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" />
-        <circle cx="18.4" cy="13.6" r="2" fill="#fff" />
-      </svg>
+      <div class="wordmark" aria-label="The Brain Maze">
+        <span class="wordmark-text" aria-hidden="true"><span>The Brain</span><span>Maze</span></span>
+        <img class="brand-mark" src="assets/brain-mark.png" alt="" width="42" height="42" />
+      </div>
+      <span class="brand-divider" aria-hidden="true"></span>
       <div>
         <h1>Unit Circle Waves</h1>
         <p class="tagline">How circular motion draws sine and cosine</p>
@@ -66,7 +65,7 @@
       </div>
 
       <div class="angle-row">
-        <label for="angle" class="field-label">Angle θ</label>
+        <label for="angle" class="field-label">Angle <span class="sym">θ</span></label>
         <input id="angle" type="range" min="0" max="360" step="0.5" value="0" />
         <output id="angleOut" for="angle" class="field-value">0.0°</output>
       </div>
@@ -144,8 +143,8 @@
       <p class="hint">Drag a highlighted number sideways, or focus it and use the arrow keys, to change it.</p>
       <p class="eq-note" id="eqNote"></p>
       <div class="identities">
-        <div><span class="lbl">sin θ</span> = opposite / hypotenuse = <span class="sin-c">y</span> / 1</div>
-        <div><span class="lbl">cos θ</span> = adjacent / hypotenuse = <span class="cos-c">x</span> / 1</div>
+        <div><span class="lbl">sin <span class="sym">θ</span></span> = opposite / hypotenuse = <span class="sin-c">y</span> / 1</div>
+        <div><span class="lbl">cos <span class="sym">θ</span></span> = adjacent / hypotenuse = <span class="cos-c">x</span> / 1</div>
         <div><span class="lbl">Compare</span> sin θ = cos(θ − 90°)</div>
       </div>
     </section>
